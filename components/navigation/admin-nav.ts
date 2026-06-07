@@ -44,4 +44,13 @@ export const adminNavItems = [
     href: "/reports",
     icon: BarChart3,
   },
+  {
+  title: "Categories",
+  href: "/categories"
+}
+,
+{
+  title: "Subcategories",
+  href: "/subcategories"
+}
 ];
