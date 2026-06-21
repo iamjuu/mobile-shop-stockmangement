@@ -4,9 +4,11 @@ import {
   ArrowUpRight,
   Boxes,
   Package,
+  RefreshCcw,
   ReceiptText,
   Store,
   Tags,
+  TrendingUp,
   Users,
 } from "lucide-react";
 
@@ -22,6 +24,8 @@ export default async function DashboardPage() {
     totalCategories,
     totalStockResult,
     lowStockItems,
+    shops,
+    availableStockProducts,
   ] = await Promise.all([
     prisma.shop.count(),
     prisma.product.count(),
@@ -49,6 +53,21 @@ export default async function DashboardPage() {
         stock: "asc",
       },
       take: 4,
+    }),
+    prisma.shop.findMany({
+      orderBy: {
+        shopName: "asc",
+      },
+      take: 6,
+    }),
+    prisma.product.findMany({
+      include: {
+        shop: true,
+      },
+      orderBy: {
+        stock: "desc",
+      },
+      take: 6,
     }),
   ]);
 
@@ -78,6 +97,12 @@ export default async function DashboardPage() {
       value: formatter.format(totalEmployees),
       detail: "Billing users",
       icon: Users,
+    },
+    {
+      label: "Exchange",
+      value: "0",
+      detail: "Next phase data",
+      icon: RefreshCcw,
     },
   ];
 
@@ -170,7 +195,7 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {stats.map((stat) => {
           const Icon = stat.icon;
 
@@ -192,6 +217,114 @@ export default async function DashboardPage() {
             </div>
           );
         })}
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-3">
+        <div className="rounded-[24px] border border-zinc-200 bg-white p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h3 className="text-2xl font-semibold">Shops</h3>
+              <p className="mt-1 text-sm text-zinc-500">
+                Active store list
+              </p>
+            </div>
+            <Store className="h-7 w-7 text-zinc-700" />
+          </div>
+
+          <div className="mt-6 space-y-3">
+            {shops.length > 0 ? (
+              shops.map((shop) => (
+                <div
+                  key={shop.id}
+                  className="flex items-center justify-between gap-3 rounded-2xl bg-zinc-50 px-4 py-4"
+                >
+                  <div>
+                    <p className="font-medium text-zinc-950">
+                      {shop.shopName}
+                    </p>
+                    <p className="text-sm text-zinc-500">
+                      {shop.phone || "Phone not added"}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-zinc-700">
+                    {shop.shopCode}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-2xl bg-zinc-50 px-4 py-8 text-center text-sm text-zinc-500">
+                No shops found.
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-[24px] border border-zinc-200 bg-white p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h3 className="text-2xl font-semibold">High sale products</h3>
+              <p className="mt-1 text-sm text-zinc-500">
+                Will use billing data
+              </p>
+            </div>
+            <TrendingUp className="h-7 w-7 text-zinc-700" />
+          </div>
+
+          <div className="mt-6 rounded-2xl bg-zinc-50 px-4 py-8 text-center">
+            <p className="text-sm font-medium text-zinc-950">
+              Sales tracking comes next
+            </p>
+            <p className="mt-2 text-sm leading-6 text-zinc-500">
+              After the billing phase, this card will rank products by quantity
+              sold and revenue.
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-[24px] border border-zinc-200 bg-white p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h3 className="text-2xl font-semibold">Available stock</h3>
+              <p className="mt-1 text-sm text-zinc-500">
+                Product names with current units
+              </p>
+            </div>
+            <Boxes className="h-7 w-7 text-zinc-700" />
+          </div>
+
+          <div className="mt-6 space-y-3">
+            {availableStockProducts.length > 0 ? (
+              availableStockProducts.map((product) => (
+                <div
+                  key={product.id}
+                  className="flex items-center justify-between gap-3 rounded-2xl bg-zinc-50 px-4 py-4"
+                >
+                  <div>
+                    <p className="font-medium text-zinc-950">
+                      {product.productName}
+                    </p>
+                    <p className="text-sm text-zinc-500">
+                      {product.shop.shopName}
+                    </p>
+                  </div>
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                      product.stock <= 5
+                        ? "bg-amber-50 text-amber-700"
+                        : "bg-emerald-50 text-emerald-700"
+                    }`}
+                  >
+                    {product.stock} units
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-2xl bg-zinc-50 px-4 py-8 text-center text-sm text-zinc-500">
+                No products found.
+              </div>
+            )}
+          </div>
+        </div>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1fr_380px]">
