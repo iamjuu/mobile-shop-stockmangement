@@ -8,9 +8,13 @@ const service =
   new CategoryService();
 
 export async function createCategoryAction(
-  name: string
+  name: string,
+  shopId?: string | null
 ) {
-  await service.create(name);
+  await service.create(
+    name,
+    shopId
+  );
 
-  revalidatePath("/categories");
+  revalidatePath("/admin/categories");
 }

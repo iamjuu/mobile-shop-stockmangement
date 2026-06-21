@@ -1,16 +1,16 @@
-import { auth } from "@clerk/nextjs/server";
 import { prisma } from "./prisma";
+import { getSessionPayload } from "./auth";
 
 export async function getCurrentUser() {
-  const { userId } = await auth();
+  const session = await getSessionPayload();
 
-  if (!userId) {
+  if (!session?.sub) {
     return null;
   }
 
   return prisma.user.findUnique({
     where: {
-      clerkId: userId,
+      id: session.sub,
     },
   });
 }

@@ -9,34 +9,37 @@ export function AdminSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-64 border-r bg-white h-screen">
-      <div className="h-16 flex items-center px-6 border-b">
-        <h2 className="font-bold text-lg">
-          Inventory POS
-        </h2>
-      </div>
+    <header className="sticky top-0 z-30 border-b border-zinc-200 bg-[#f4f2eb]/95 p-[10px] backdrop-blur">
+      <div className="flex w-full flex-col gap-4 lg:flex-row lg:justify-between">
+        <Link
+          href="/admin/admin-dashboard"
+          className="inline-flex w-fit items-center rounded-full border border-zinc-300 bg-white px-4 py-2 text-xl font-semibold"
+        >
+          Stock Manager
+        </Link>
 
-      <nav className="p-4 space-y-2">
-        {adminNavItems.map((item) => {
-          const Icon = item.icon;
+        <nav className="flex gap-2 overflow-x-auto rounded-full bg-white/70 p-1">
+          {adminNavItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = pathname === item.href;
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2 transition
-                ${
-                  pathname === item.href
-                    ? "bg-black text-white"
-                    : "hover:bg-gray-100"
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
+                  isActive
+                    ? "bg-zinc-950 text-white shadow-sm"
+                    : "text-zinc-700 hover:bg-white hover:text-zinc-950"
                 }`}
-            >
-              <Icon size={18} />
-              {item.title}
-            </Link>
-          );
-        })}
-      </nav>
-    </aside>
+              >
+                <Icon size={16} />
+                {item.title}
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
+    </header>
   );
 }

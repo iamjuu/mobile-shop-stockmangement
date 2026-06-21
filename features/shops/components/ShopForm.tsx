@@ -2,15 +2,17 @@
 
 import { useForm } from "react-hook-form";
 
+export interface ShopFormValues {
+  shopName: string;
+  shopCode: string;
+  address?: string;
+  phone?: string;
+  description?: string;
+}
+
 interface ShopFormProps {
-  defaultValues?: {
-    shopName: string;
-    shopCode: string;
-    address?: string;
-    phone?: string;
-    description?: string;
-  };
-  onSubmit: (data: any) => Promise<void>;
+  defaultValues?: ShopFormValues;
+  onSubmit: (data: ShopFormValues) => Promise<void>;
 }
 
 export function ShopForm({
@@ -20,7 +22,7 @@ export function ShopForm({
   const {
     register,
     handleSubmit,
-  } = useForm({
+  } = useForm<ShopFormValues>({
     defaultValues,
   });
 

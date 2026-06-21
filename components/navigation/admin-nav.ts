@@ -11,46 +11,37 @@ import {
 export const adminNavItems = [
   {
     title: "Dashboard",
-    href: "/dashboard",
+    href: "/admin/admin-dashboard",
     icon: LayoutDashboard,
   },
   {
     title: "Shops",
-    href: "/shops",
+    href: "/admin/shops",
     icon: Store,
   },
   {
     title: "Categories",
-    href: "/categories",
+    href: "/admin/categories",
     icon: Tags,
   },
   {
     title: "Subcategories",
-    href: "/subcategories",
+    href: "/admin/subcategories",
     icon: Boxes,
   },
   {
     title: "Products",
-    href: "/products",
+    href: "/admin/products",
     icon: Package,
   },
   {
     title: "Employees",
-    href: "/employees",
+    href: "/admin/employees",
     icon: Users,
   },
   {
     title: "Reports",
-    href: "/reports",
+    href: "/admin/reports",
     icon: BarChart3,
   },
-  {
-  title: "Categories",
-  href: "/categories"
-}
-,
-{
-  title: "Subcategories",
-  href: "/subcategories"
-}
 ];

@@ -13,13 +13,82 @@ enum Role {
 }
 
 model User {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  clerkId   String   @unique
+  id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  name      String
-  email     String   @unique
+  name         String
+  email        String @unique
+  passwordHash String
 
-  role      Role     @default(EMPLOYEE)
+  role Role @default(EMPLOYEE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Shop {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  shopName    String
+  shopCode    String  @unique
+  address     String?
+  phone       String?
+  description String?
+
+  products Product[]
+  categories Category[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Category {
+  id   String @id @default(auto()) @map("_id") @db.ObjectId
+  name String
+
+  shopId String? @db.ObjectId
+  shop   Shop?   @relation(fields: [shopId], references: [id])
+
+  subcategories SubCategory[]
+  products      Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([shopId])
+}
+
+model SubCategory {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  name       String
+  categoryId String @db.ObjectId
+
+  category Category  @relation(fields: [categoryId], references: [id])
+  products Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Product {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  productCode String @unique
+  productName String
+
+  shopId        String @db.ObjectId
+  categoryId    String @db.ObjectId
+  subcategoryId String @db.ObjectId
+
+  purchasePrice Float?
+  price         Float
+  stock         Int
+
+  imageUrl    String?
+  description String?
+  qrCode      String?
+  barcode     String?
+
+  shop        Shop        @relation(fields: [shopId], references: [id])
+  category    Category    @relation(fields: [categoryId], references: [id])
+  subcategory SubCategory @relation(fields: [subcategoryId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

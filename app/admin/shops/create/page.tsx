@@ -1,17 +1,20 @@
 import { redirect } from "next/navigation";
 
 import { createShopAction } from "@/features/shops/actions/create-shop";
-import { ShopForm } from "@/features/shops/components/ShopForm";
+import {
+  ShopForm,
+  type ShopFormValues,
+} from "@/features/shops/components/ShopForm";
 
 export default function CreateShopPage() {
   async function submit(
-    data: any
+    data: ShopFormValues
   ) {
     "use server";
 
     await createShopAction(data);
 
-    redirect("/shops");
+    redirect("/admin/shops");
   }
 
   return (

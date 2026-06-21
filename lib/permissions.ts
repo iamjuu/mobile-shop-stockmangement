@@ -4,14 +4,18 @@ export enum Role {
 }
 
 export const ADMIN_ROUTES = [
-  "/dashboard",
-  "/shops",
-  "/products",
-  "/categories",
-  "/employees",
+  "/admin/admin-dashboard",
+  "/admin/shops",
+  "/admin/products",
+  "/admin/categories",
+  "/admin/subcategories",
+  "/admin/employees",
+  "/admin/reports",
+  "/admin/inventory",
 ];
 
 export const EMPLOYEE_ROUTES = [
-  "/billing",
-  "/sales-history",
+  "/employee/dashboard",
+  "/employee/billing",
+  "/employee/sales-history",
 ];

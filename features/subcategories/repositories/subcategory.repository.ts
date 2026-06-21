@@ -4,7 +4,14 @@ export class SubCategoryRepository {
   async findAll() {
     return prisma.subCategory.findMany({
       include: {
-        category: true,
+        category: {
+          include: {
+            shop: true,
+          },
+        },
+      },
+      orderBy: {
+        name: "asc",
       },
     });
   }

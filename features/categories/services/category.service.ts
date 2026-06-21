@@ -12,8 +12,14 @@ export class CategoryService {
     return repository.findById(id);
   }
 
-  create(name: string) {
-    return repository.create(name);
+  create(
+    name: string,
+    shopId?: string | null
+  ) {
+    return repository.create(
+      name,
+      shopId
+    );
   }
 
   update(

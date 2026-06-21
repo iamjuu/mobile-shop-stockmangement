@@ -15,7 +15,7 @@ export default async function Layout({
   }
 
   if (user.role !== "ADMIN") {
-    redirect("/billing");
+    redirect("/employee/billing");
   }
 
   return (

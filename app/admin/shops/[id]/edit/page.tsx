@@ -8,7 +8,10 @@ import {
   updateShopAction,
 } from "@/features/shops/actions/update-shop";
 
-import { ShopForm } from "@/features/shops/components/ShopForm";
+import {
+  ShopForm,
+  type ShopFormValues,
+} from "@/features/shops/components/ShopForm";
 
 export default async function EditPage({
   params,
@@ -23,7 +26,7 @@ export default async function EditPage({
     await getShopByIdAction(id);
 
   async function submit(
-    data: any
+    data: ShopFormValues
   ) {
     "use server";
 
@@ -32,7 +35,7 @@ export default async function EditPage({
       ...data,
     });
 
-    redirect("/shops");
+    redirect("/admin/shops");
   }
 
   return (

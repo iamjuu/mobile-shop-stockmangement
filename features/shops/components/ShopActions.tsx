@@ -11,10 +11,10 @@ export function ShopActions({
   id: string;
 }) {
   return (
-    <div className="flex gap-4">
+    <div className="flex justify-end gap-2">
       <Link
-        href={`/shops/${id}/edit`}
-        className="text-blue-600"
+        href={`/admin/shops/${id}/edit`}
+        className="rounded-full border border-zinc-300 px-4 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
       >
         Edit
       </Link>

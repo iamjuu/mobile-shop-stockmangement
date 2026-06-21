@@ -3,6 +3,9 @@ import { prisma } from "@/lib/prisma";
 export class CategoryRepository {
   async findAll() {
     return prisma.category.findMany({
+      include: {
+        shop: true,
+      },
       orderBy: {
         name: "asc",
       },
@@ -15,10 +18,14 @@ export class CategoryRepository {
     });
   }
 
-  async create(name: string) {
+  async create(
+    name: string,
+    shopId?: string | null
+  ) {
     return prisma.category.create({
       data: {
         name,
+        shopId: shopId || null,
       },
     });
   }
