@@ -15,7 +15,7 @@ export default async function Layout({
   }
 
   return (
-    <EmployeeLayout>
+    <EmployeeLayout userName={user.name}>
       {children}
     </EmployeeLayout>
   );

@@ -21,6 +21,8 @@ model User {
 
   role Role @default(EMPLOYEE)
 
+  sales Sale[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -35,6 +37,7 @@ model Shop {
 
   products Product[]
   categories Category[]
+  sales      Sale[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -82,6 +85,8 @@ model Product {
   stock         Int
 
   imageUrl    String?
+  mainImageUrl String?
+  galleryImageUrls String[] @default([])
   description String?
   qrCode      String?
   barcode     String?
@@ -89,7 +94,35 @@ model Product {
   shop        Shop        @relation(fields: [shopId], references: [id])
   category    Category    @relation(fields: [categoryId], references: [id])
   subcategory SubCategory @relation(fields: [subcategoryId], references: [id])
+  sales       Sale[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Sale {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  employeeId String @db.ObjectId
+  productId  String @db.ObjectId
+  shopId     String @db.ObjectId
+
+  productCode String
+  productName String
+  quantity    Int
+
+  unitPrice     Float
+  purchasePrice Float?
+  totalAmount   Float
+  profit        Float
+
+  employee User    @relation(fields: [employeeId], references: [id])
+  product  Product @relation(fields: [productId], references: [id])
+  shop     Shop    @relation(fields: [shopId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([employeeId])
+  @@index([productId])
+  @@index([shopId])
 }

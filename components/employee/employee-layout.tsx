@@ -5,22 +5,21 @@ import { EmployeeHeader } from "./employee-header";
 
 interface Props {
   children: ReactNode;
+  userName: string;
 }
 
 export function EmployeeLayout({
   children,
+  userName,
 }: Props) {
   return (
-    <div className="flex">
+    <div className="min-h-screen bg-[#f4f2eb] text-zinc-950">
       <EmployeeSidebar />
+      <EmployeeHeader userName={userName} />
 
-      <div className="flex-1">
-        <EmployeeHeader />
-
-        <main className="p-6">
-          {children}
-        </main>
-      </div>
+      <main className="w-full p-[10px]">
+        {children}
+      </main>
     </div>
   );
 }

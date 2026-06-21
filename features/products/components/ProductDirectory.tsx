@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { Download, Printer, X } from "lucide-react";
+import { Download, Pencil, Printer, Trash2, X } from "lucide-react";
+import Image from "next/image";
 
 import { QRPreview } from "./QRPreview";
 
@@ -15,11 +16,30 @@ interface ProductDirectoryItem {
   purchasePrice?: number | null;
   price: number;
   stock: number;
+  mainImageUrl?: string | null;
+  galleryImageUrls?: string[];
   description?: string | null;
 }
 
 interface ProductDirectoryProps {
   products: ProductDirectoryItem[];
+  updateAction: (
+    productId: string,
+    data: {
+      productName: string;
+      purchasePrice: number;
+      price: number;
+      stock: number;
+      description?: string;
+    }
+  ) => Promise<{
+    ok: boolean;
+    message: string;
+  }>;
+  deleteAction: (productId: string) => Promise<{
+    ok: boolean;
+    message: string;
+  }>;
 }
 
 const currency = new Intl.NumberFormat("en-IN", {
@@ -38,9 +58,15 @@ function escapeHtml(value: string) {
 
 export function ProductDirectory({
   products,
+  updateAction,
+  deleteAction,
 }: ProductDirectoryProps) {
   const [selectedProduct, setSelectedProduct] =
     useState<ProductDirectoryItem | null>(null);
+  const [editProduct, setEditProduct] =
+    useState<ProductDirectoryItem | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const qrRef = useRef<HTMLDivElement>(null);
 
   const qrValue = useMemo(() => {
@@ -186,6 +212,52 @@ export function ProductDirectory({
     printWindow.document.close();
   }
 
+  function showToast(message: string) {
+    setToast(message);
+    window.setTimeout(() => {
+      setToast(null);
+    }, 2500);
+  }
+
+  async function handleDelete(product: ProductDirectoryItem) {
+    const ok = window.confirm(
+      `Delete ${product.productName}? This action cannot be undone.`
+    );
+
+    if (!ok) {
+      return;
+    }
+
+    const result = await deleteAction(product.id);
+    showToast(result.message);
+  }
+
+  async function handleUpdate(formData: FormData) {
+    if (!editProduct) {
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      const result = await updateAction(editProduct.id, {
+        productName: String(formData.get("productName") ?? ""),
+        purchasePrice: Number(formData.get("purchasePrice") ?? 0),
+        price: Number(formData.get("price") ?? 0),
+        stock: Number(formData.get("stock") ?? 0),
+        description: String(formData.get("description") ?? ""),
+      });
+
+      showToast(result.message);
+
+      if (result.ok) {
+        setEditProduct(null);
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
     <>
       <section className="overflow-hidden rounded-[24px] border border-zinc-200 bg-white">
@@ -200,8 +272,8 @@ export function ProductDirectory({
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] border-collapse text-left">
+        <div className="scrollbar-hover overflow-x-auto">
+          <table className="w-full min-w-[1100px] border-collapse text-left">
             <thead className="bg-zinc-50 text-xs font-semibold uppercase tracking-wide text-zinc-500">
               <tr>
                 <th className="px-5 py-4">Product</th>
@@ -228,9 +300,22 @@ export function ProductDirectory({
                   >
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-950 text-sm font-semibold text-white">
-                          {product.productName.slice(0, 1).toUpperCase()}
-                        </div>
+                        {product.mainImageUrl ? (
+                          <div className="size-12 shrink-0 overflow-hidden rounded-full bg-zinc-100">
+                            <Image
+                              src={product.mainImageUrl}
+                              alt={product.productName}
+                              width={48}
+                              height={48}
+                              unoptimized
+                              className="size-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-zinc-950 text-sm font-semibold text-white">
+                            {product.productName.slice(0, 1).toUpperCase()}
+                          </div>
+                        )}
                         <div>
                           <p className="font-medium text-zinc-950">
                             {product.productName}
@@ -272,17 +357,41 @@ export function ProductDirectory({
                         {product.stock} units
                       </span>
                     </td>
-                    <td className="px-5 py-4 text-right">
-                      <button
-                        type="button"
-                        className="rounded-full border border-zinc-300 px-4 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setSelectedProduct(product);
-                        }}
-                      >
-                        QR
-                      </button>
+                    <td className="px-5 py-4">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          className="rounded-full border border-zinc-300 px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setSelectedProduct(product);
+                          }}
+                        >
+                          QR
+                        </button>
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 rounded-full px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setEditProduct(product);
+                          }}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          
+                        </button>
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 rounded-full px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleDelete(product);
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -327,6 +436,16 @@ export function ProductDirectory({
 
             <div className="grid gap-6 p-5 md:grid-cols-[260px_1fr]">
               <div className="flex flex-col items-center justify-center rounded-[24px] bg-zinc-50 p-6">
+                {selectedProduct.mainImageUrl ? (
+                  <Image
+                    src={selectedProduct.mainImageUrl}
+                    alt={selectedProduct.productName}
+                    width={180}
+                    height={180}
+                    unoptimized
+                    className="mb-5 aspect-square w-full max-w-[180px] rounded-3xl object-cover"
+                  />
+                ) : null}
                 <div
                   ref={qrRef}
                   className="rounded-2xl bg-white p-4"
@@ -357,6 +476,22 @@ export function ProductDirectory({
               </div>
 
               <div className="space-y-3">
+                {selectedProduct.galleryImageUrls?.length ? (
+                  <div className="grid grid-cols-3 gap-3">
+                    {selectedProduct.galleryImageUrls.map((imageUrl, index) => (
+                      <Image
+                        key={imageUrl}
+                        src={imageUrl}
+                        alt={`${selectedProduct.productName} ${index + 1}`}
+                        width={120}
+                        height={120}
+                        unoptimized
+                        className="aspect-square rounded-2xl object-cover"
+                      />
+                    ))}
+                  </div>
+                ) : null}
+
                 {[
                   ["Product Code", selectedProduct.productCode],
                   ["Shop", selectedProduct.shopName],
@@ -394,6 +529,154 @@ export function ProductDirectory({
               </div>
             </div>
           </div>
+        </div>
+      ) : null}
+
+      {editProduct ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-2xl overflow-hidden rounded-[28px] bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-zinc-200 p-5">
+              <div>
+                <p className="text-sm font-medium text-zinc-500">
+                  Edit product
+                </p>
+                <h3 className="mt-1 text-2xl font-semibold">
+                  {editProduct.productName}
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-300 hover:bg-zinc-50"
+                onClick={() => {
+                  setEditProduct(null);
+                }}
+                aria-label="Close edit product"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form
+              action={handleUpdate}
+              className="space-y-4 p-5"
+            >
+              <div>
+                <label
+                  htmlFor="editProductName"
+                  className="mb-2 block text-sm font-medium text-zinc-700"
+                >
+                  Product name
+                </label>
+                <input
+                  id="editProductName"
+                  name="productName"
+                  defaultValue={editProduct.productName}
+                  required
+                  className="w-full rounded-full border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-950"
+                />
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div>
+                  <label
+                    htmlFor="editPurchasePrice"
+                    className="mb-2 block text-sm font-medium text-zinc-700"
+                  >
+                    Purchase price
+                  </label>
+                  <input
+                    id="editPurchasePrice"
+                    name="purchasePrice"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    defaultValue={editProduct.purchasePrice ?? 0}
+                    required
+                    className="w-full rounded-full border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-950"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="editPrice"
+                    className="mb-2 block text-sm font-medium text-zinc-700"
+                  >
+                    Selling price
+                  </label>
+                  <input
+                    id="editPrice"
+                    name="price"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    defaultValue={editProduct.price}
+                    required
+                    className="w-full rounded-full border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-950"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="editStock"
+                    className="mb-2 block text-sm font-medium text-zinc-700"
+                  >
+                    Stock
+                  </label>
+                  <input
+                    id="editStock"
+                    name="stock"
+                    type="number"
+                    min="0"
+                    step="1"
+                    defaultValue={editProduct.stock}
+                    required
+                    className="w-full rounded-full border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-950"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="editDescription"
+                  className="mb-2 block text-sm font-medium text-zinc-700"
+                >
+                  Description
+                </label>
+                <textarea
+                  id="editDescription"
+                  name="description"
+                  rows={3}
+                  defaultValue={editProduct.description ?? ""}
+                  className="w-full resize-none rounded-3xl border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-950"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <button
+                  type="button"
+                  className="rounded-full border border-zinc-300 px-5 py-3 text-sm font-semibold text-zinc-700 hover:bg-zinc-100"
+                  onClick={() => {
+                    setEditProduct(null);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
+                >
+                  {isSaving ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {toast ? (
+        <div className="fixed bottom-5 right-5 z-[60] rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white shadow-xl">
+          {toast}
         </div>
       ) : null}
     </>

@@ -37,6 +37,7 @@ export function ProductCreateForm({
 }: ProductCreateFormProps) {
   const [shopId, setShopId] = useState(shops[0]?.id ?? "");
   const [categoryId, setCategoryId] = useState("");
+  const [galleryCount, setGalleryCount] = useState(0);
 
   const availableCategories = useMemo(
     () =>
@@ -79,6 +80,58 @@ export function ProductCreateForm({
           placeholder="Example: iPhone charger"
           className="w-full rounded-full border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-950"
         />
+      </div>
+
+      <div>
+        <label
+          htmlFor="mainImage"
+          className="mb-2 block text-sm font-medium text-zinc-700"
+        >
+          Main image
+        </label>
+        <input
+          id="mainImage"
+          name="mainImage"
+          type="file"
+          accept="image/*"
+          required
+          className="w-full rounded-3xl border border-dashed border-zinc-300 bg-white px-4 py-4 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-zinc-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+        />
+        <p className="mt-2 text-xs text-zinc-500">
+          Required. This image appears in product lists and sale screens.
+        </p>
+      </div>
+
+      <div>
+        <label
+          htmlFor="galleryImages"
+          className="mb-2 block text-sm font-medium text-zinc-700"
+        >
+          Other images
+        </label>
+        <input
+          id="galleryImages"
+          name="galleryImages"
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={(event) => {
+            const files = Array.from(event.target.files ?? []);
+
+            if (files.length > 3) {
+              window.alert("You can upload a maximum of 3 optional images.");
+              event.target.value = "";
+              setGalleryCount(0);
+              return;
+            }
+
+            setGalleryCount(files.length);
+          }}
+          className="w-full rounded-3xl border border-dashed border-zinc-300 bg-white px-4 py-4 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-zinc-100 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-zinc-700"
+        />
+        <p className="mt-2 text-xs text-zinc-500">
+          Optional. Maximum 3 images selected: {galleryCount}
+        </p>
       </div>
 
       <div>

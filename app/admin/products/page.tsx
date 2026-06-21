@@ -10,6 +10,22 @@ import { ShopService } from "@/features/shops/services/shop.service";
 import { SubCategoryService } from "@/features/subcategories/services/subcategory.service";
 import { prisma } from "@/lib/prisma";
 
+const MAX_IMAGE_SIZE_BYTES = 2 * 1024 * 1024;
+
+function isUploadedFile(value: FormDataEntryValue | null): value is File {
+  return value instanceof File && value.size > 0;
+}
+
+function isValidImage(file: File) {
+  return file.type.startsWith("image/") && file.size <= MAX_IMAGE_SIZE_BYTES;
+}
+
+async function fileToDataUrl(file: File) {
+  const buffer = Buffer.from(await file.arrayBuffer());
+
+  return `data:${file.type};base64,${buffer.toString("base64")}`;
+}
+
 export default async function ProductsPage() {
   const shopService = new ShopService();
   const categoryService = new CategoryService();
@@ -43,6 +59,22 @@ export default async function ProductsPage() {
     });
 
     if (!parsed.success) {
+      return;
+    }
+
+    const mainImage = formData.get("mainImage");
+    const galleryImages = formData
+      .getAll("galleryImages")
+      .filter(isUploadedFile);
+
+    if (!isUploadedFile(mainImage) || !isValidImage(mainImage)) {
+      return;
+    }
+
+    if (
+      galleryImages.length > 3 ||
+      galleryImages.some((file) => !isValidImage(file))
+    ) {
       return;
     }
 
@@ -81,10 +113,96 @@ export default async function ProductsPage() {
     }
 
     const service = new ProductService();
-    await service.create(parsed.data);
+    const mainImageUrl = await fileToDataUrl(mainImage);
+    const galleryImageUrls = await Promise.all(
+      galleryImages.map((file) => fileToDataUrl(file))
+    );
+
+    await service.create({
+      ...parsed.data,
+      imageUrl: mainImageUrl,
+      mainImageUrl,
+      galleryImageUrls,
+    });
 
     revalidatePath("/admin/products");
     revalidatePath("/admin/admin-dashboard");
+  }
+
+  async function updateProduct(
+    productId: string,
+    data: {
+      productName: string;
+      purchasePrice: number;
+      price: number;
+      stock: number;
+      description?: string;
+    }
+  ) {
+    "use server";
+
+    const productName = data.productName.trim();
+
+    if (
+      !productId ||
+      productName.length < 2 ||
+      data.purchasePrice < 0 ||
+      data.price < 0 ||
+      data.stock < 0
+    ) {
+      return {
+        ok: false,
+        message: "Invalid product details.",
+      };
+    }
+
+    await prisma.product.update({
+      where: {
+        id: productId,
+      },
+      data: {
+        productName,
+        purchasePrice: data.purchasePrice,
+        price: data.price,
+        stock: Math.trunc(data.stock),
+        description: data.description?.trim() || null,
+      },
+    });
+
+    revalidatePath("/admin/products");
+    revalidatePath("/admin/admin-dashboard");
+    revalidatePath("/employee/billing");
+
+    return {
+      ok: true,
+      message: "Product updated successfully.",
+    };
+  }
+
+  async function deleteProduct(productId: string) {
+    "use server";
+
+    if (!productId) {
+      return {
+        ok: false,
+        message: "Invalid product.",
+      };
+    }
+
+    await prisma.product.delete({
+      where: {
+        id: productId,
+      },
+    });
+
+    revalidatePath("/admin/products");
+    revalidatePath("/admin/admin-dashboard");
+    revalidatePath("/employee/billing");
+
+    return {
+      ok: true,
+      message: "Product deleted successfully.",
+    };
   }
 
   const formShops = shops.map((shop) => ({
@@ -116,6 +234,8 @@ export default async function ProductsPage() {
     purchasePrice: product.purchasePrice,
     price: product.price,
     stock: product.stock,
+    mainImageUrl: product.mainImageUrl ?? product.imageUrl,
+    galleryImageUrls: product.galleryImageUrls,
     description: product.description,
   }));
 
@@ -150,7 +270,11 @@ export default async function ProductsPage() {
           />
         </section>
 
-        <ProductDirectory products={directoryProducts} />
+        <ProductDirectory
+          products={directoryProducts}
+          updateAction={updateProduct}
+          deleteAction={deleteProduct}
+        />
       </div>
     </div>
   );

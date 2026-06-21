@@ -22,6 +22,12 @@ export const productSchema =
 
     imageUrl:
       z.string().optional(),
+
+    mainImageUrl:
+      z.string().optional(),
+
+    galleryImageUrls:
+      z.array(z.string()).optional(),
   });
 
 export type ProductFormValues =
