@@ -1,8 +1,11 @@
 import { Tags } from "lucide-react";
+import { revalidatePath } from "next/cache";
 
 import { createCategoryAction } from "@/features/categories/actions/create-category";
+import { CategoryDirectory } from "@/features/categories/components/CategoryDirectory";
 import { CategoryService } from "@/features/categories/services/category.service";
 import { ShopService } from "@/features/shops/services/shop.service";
+import { prisma } from "@/lib/prisma";
 
 export default async function CategoriesPage() {
   const categoryService = new CategoryService();
@@ -31,6 +34,60 @@ export default async function CategoriesPage() {
       shopId
     );
   }
+
+  async function updateCategory(
+    categoryId: string,
+    data: {
+      name: string;
+      shopId?: string | null;
+    }
+  ) {
+    "use server";
+
+    const name = data.name.trim();
+
+    if (!categoryId || name.length < 2) {
+      return {
+        ok: false,
+        message: "Invalid category details.",
+      };
+    }
+
+    await prisma.category.update({
+      where: {
+        id: categoryId,
+      },
+      data: {
+        name,
+        shopId: data.shopId || null,
+      },
+    });
+
+    revalidatePath("/admin/categories");
+    revalidatePath("/admin/products");
+    revalidatePath("/employee/billing");
+
+    return {
+      ok: true,
+      message: "Category updated successfully.",
+    };
+  }
+
+  const directoryCategories = categories.map((category) => ({
+    id: category.id,
+    name: category.name,
+    shopId: category.shopId,
+    shopName: category.shop?.shopName,
+    createdAt: category.createdAt.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }),
+  }));
+  const directoryShops = shops.map((shop) => ({
+    id: shop.id,
+    shopName: shop.shopName,
+  }));
 
   return (
     <div className="space-y-5">
@@ -114,92 +171,11 @@ export default async function CategoriesPage() {
           </form>
         </section>
 
-        <section className="overflow-hidden rounded-[24px] border border-zinc-200 bg-white">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 px-5 py-4">
-            <div>
-              <h2 className="text-lg font-semibold">
-                Category directory
-              </h2>
-              <p className="mt-1 text-sm text-zinc-500">
-                {categories.length} categories configured
-              </p>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[620px] border-collapse text-left">
-              <thead className="bg-zinc-50 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                <tr>
-                  <th className="px-5 py-4">
-                    Name
-                  </th>
-                  <th className="px-5 py-4">
-                    Shop
-                  </th>
-                  <th className="px-5 py-4">
-                    Created
-                  </th>
-                  <th className="px-5 py-4 text-right">
-                    Status
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-zinc-100 text-sm">
-                {categories.length > 0 ? (
-                  categories.map((category) => (
-                    <tr
-                      key={category.id}
-                      className="transition hover:bg-zinc-50"
-                    >
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 text-sm font-semibold text-zinc-700">
-                            {category.name.slice(0, 1).toUpperCase()}
-                          </div>
-                          <div>
-                            <p className="font-medium text-zinc-950">
-                              {category.name}
-                            </p>
-                            <p className="text-xs text-zinc-500">
-                              Product category
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className="inline-flex rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700">
-                          {category.shop?.shopName ?? "All shops"}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4 text-zinc-600">
-                        {category.createdAt.toLocaleDateString("en-IN", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        })}
-                      </td>
-                      <td className="px-5 py-4 text-right">
-                        <span className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                          Active
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td
-                      colSpan={4}
-                      className="px-5 py-12 text-center text-sm text-zinc-500"
-                    >
-                      No categories found. Create your first category to organize products.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        <CategoryDirectory
+          categories={directoryCategories}
+          shops={directoryShops}
+          updateAction={updateCategory}
+        />
       </div>
     </div>
   );
