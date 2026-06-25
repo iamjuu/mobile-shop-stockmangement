@@ -12,6 +12,16 @@ enum Role {
   EMPLOYEE
 }
 
+enum ProductSource {
+  REGULAR
+  EXCHANGE_THIRD_PARTY
+}
+
+enum PaymentMethod {
+  CASH
+  UPI
+}
+
 model User {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
@@ -21,7 +31,8 @@ model User {
 
   role Role @default(EMPLOYEE)
 
-  sales Sale[]
+  sales     Sale[]
+  exchanges Exchange[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -38,6 +49,7 @@ model Shop {
   products Product[]
   categories Category[]
   sales      Sale[]
+  exchanges Exchange[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -83,6 +95,7 @@ model Product {
   purchasePrice Float?
   price         Float
   stock         Int
+  source        ProductSource? @default(REGULAR)
 
   imageUrl    String?
   mainImageUrl String?
@@ -95,9 +108,45 @@ model Product {
   category    Category    @relation(fields: [categoryId], references: [id])
   subcategory SubCategory @relation(fields: [subcategoryId], references: [id])
   sales       Sale[]
+  soldExchanges     Exchange[] @relation("SoldProduct")
+  receivedExchanges Exchange[] @relation("ReceivedProduct")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Exchange {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  employeeId        String @db.ObjectId
+  shopId            String @db.ObjectId
+  soldProductId     String @db.ObjectId
+  receivedProductId String @db.ObjectId
+
+  soldProductCode String
+  soldProductName String
+  soldProductPrice Float
+
+  receivedProductCode String
+  receivedProductName String
+  receivedProductPrice Float
+  exchangeValue       Float
+  cashBalance         Float
+  paymentMethod       PaymentMethod? @default(CASH)
+  condition           String?
+  notes               String?
+
+  employee        User    @relation(fields: [employeeId], references: [id])
+  shop            Shop    @relation(fields: [shopId], references: [id])
+  soldProduct     Product @relation("SoldProduct", fields: [soldProductId], references: [id])
+  receivedProduct Product @relation("ReceivedProduct", fields: [receivedProductId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([employeeId])
+  @@index([shopId])
+  @@index([soldProductId])
+  @@index([receivedProductId])
 }
 
 model Sale {

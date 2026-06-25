@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 
+import { PendingSubmitButton } from "@/components/pending-submit-button";
+
 interface ShopOption {
   id: string;
   shopName: string;
@@ -196,7 +198,7 @@ export function ProductCreateForm({
           htmlFor="subcategoryId"
           className="mb-2 block text-sm font-medium text-zinc-700"
         >
-          Subcategory
+          Brand
         </label>
         <select
           id="subcategoryId"
@@ -291,17 +293,17 @@ export function ProductCreateForm({
         />
       </div>
 
-      <button
-        type="submit"
+      <PendingSubmitButton
         disabled={
           shops.length === 0 ||
           availableCategories.length === 0 ||
           availableSubcategories.length === 0
         }
-        className="w-full rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
+        pendingLabel="Creating product..."
+        className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
       >
         Create Product
-      </button>
+      </PendingSubmitButton>
 
       {shops.length === 0 ? (
         <p className="text-sm text-red-600">Create a shop before adding products.</p>
@@ -313,7 +315,7 @@ export function ProductCreateForm({
       ) : null}
       {availableCategories.length > 0 && availableSubcategories.length === 0 ? (
         <p className="text-sm text-red-600">
-          Create a subcategory under the selected category.
+          Create a brand under the selected category.
         </p>
       ) : null}
     </form>

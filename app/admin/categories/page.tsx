@@ -1,6 +1,7 @@
 import { Tags } from "lucide-react";
 import { revalidatePath } from "next/cache";
 
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { createCategoryAction } from "@/features/categories/actions/create-category";
 import { CategoryDirectory } from "@/features/categories/components/CategoryDirectory";
 import { CategoryService } from "@/features/categories/services/category.service";
@@ -109,7 +110,7 @@ export default async function CategoriesPage() {
 
           <p className="mt-4 text-sm leading-6 text-zinc-500">
             Create top-level product groups such as groceries, electronics,
-            clothing, or medicines. Products and subcategories will be linked
+            clothing, or medicines. Products and brands will be linked
             under these categories. Choose All shops for shared categories, or
             select one shop for a branch-specific category.
           </p>
@@ -162,12 +163,12 @@ export default async function CategoriesPage() {
               </select>
             </div>
 
-            <button
-              type="submit"
-              className="w-full rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800"
+            <PendingSubmitButton
+              pendingLabel="Creating category..."
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
             >
               Create Category
-            </button>
+            </PendingSubmitButton>
           </form>
         </section>
 

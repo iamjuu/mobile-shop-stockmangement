@@ -1,6 +1,6 @@
-export function generateProductCode() {
+export function generateProductCode(prefix = "PRD") {
   const timestamp =
     Date.now();
 
-  return `PRD-${timestamp}`;
+  return `${prefix}-${timestamp}`;
 }

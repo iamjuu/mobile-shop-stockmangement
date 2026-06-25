@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Loader2 } from "lucide-react";
 
 export function CategoryForm({
   onSave,
@@ -11,12 +12,20 @@ export function CategoryForm({
 }) {
   const [name, setName] =
     useState("");
+  const [isSaving, setIsSaving] =
+    useState(false);
 
   return (
     <form
       onSubmit={async (e) => {
         e.preventDefault();
-        await onSave(name);
+        setIsSaving(true);
+
+        try {
+          await onSave(name);
+        } finally {
+          setIsSaving(false);
+        }
       }}
       className="flex gap-4"
     >
@@ -32,9 +41,19 @@ export function CategoryForm({
       />
 
       <button
-        className="bg-black text-white px-4 rounded"
+        type="submit"
+        disabled={isSaving}
+        aria-busy={isSaving}
+        className="inline-flex items-center justify-center gap-2 rounded bg-black px-4 text-white disabled:cursor-not-allowed disabled:bg-zinc-300"
       >
-        Save
+        {isSaving ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Saving...
+          </>
+        ) : (
+          "Save"
+        )}
       </button>
     </form>
   );

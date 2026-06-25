@@ -43,7 +43,9 @@ export default async function BillingPage() {
     });
 
     if (!product || quantity < 1 || product.stock < quantity) {
-      return;
+      return {
+        success: false,
+      };
     }
 
     const purchasePrice = product.purchasePrice ?? 0;
@@ -81,6 +83,10 @@ export default async function BillingPage() {
     revalidatePath("/employee/dashboard");
     revalidatePath("/employee/sales-history");
     revalidatePath("/admin/admin-dashboard");
+
+    return {
+      success: true,
+    };
   }
 
   const billingShops = shops.map((shop) => ({

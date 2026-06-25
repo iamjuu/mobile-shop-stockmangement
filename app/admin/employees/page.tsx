@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { Users } from "lucide-react";
 
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -127,12 +128,12 @@ export default async function EmployeesPage() {
               />
             </div>
 
-            <button
-              type="submit"
-              className="w-full rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800"
+            <PendingSubmitButton
+              pendingLabel="Creating employee..."
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
             >
               Create Employee
-            </button>
+            </PendingSubmitButton>
           </form>
         </section>
 

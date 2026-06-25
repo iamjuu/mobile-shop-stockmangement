@@ -7,6 +7,7 @@ export const ADMIN_ROUTES = [
   "/admin/admin-dashboard",
   "/admin/shops",
   "/admin/products",
+  "/admin/exchanges",
   "/admin/categories",
   "/admin/subcategories",
   "/admin/employees",
@@ -17,5 +18,7 @@ export const ADMIN_ROUTES = [
 export const EMPLOYEE_ROUTES = [
   "/employee/dashboard",
   "/employee/billing",
+  "/employee/exchange",
+  "/employee/exchange-history",
   "/employee/sales-history",
 ];

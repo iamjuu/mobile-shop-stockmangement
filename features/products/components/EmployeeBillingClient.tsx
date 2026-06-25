@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, QrCode, X } from "lucide-react";
+import { Check, Loader2, QrCode, X } from "lucide-react";
 import Image from "next/image";
 
 import { QRPreview } from "./QRPreview";
@@ -28,7 +28,10 @@ interface BillingProduct {
 interface EmployeeBillingClientProps {
   shops: ShopOption[];
   products: BillingProduct[];
-  saleAction: (productId: string, quantity: number) => Promise<void>;
+  saleAction: (
+    productId: string,
+    quantity: number
+  ) => Promise<{ success: boolean }>;
 }
 
 const currency = new Intl.NumberFormat("en-IN", {
@@ -71,6 +74,7 @@ export function EmployeeBillingClient({
   const [saleProduct, setSaleProduct] = useState<BillingProduct | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [isSelling, setIsSelling] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
   const visibleProducts = useMemo(
     () => products.filter((product) => product.shopId === selectedShopId),
@@ -88,15 +92,16 @@ export function EmployeeBillingClient({
       );
 
       if (!product) {
-        window.alert("Product not found for the selected shop.");
+        setToast("Product not found for the selected shop.");
         return;
       }
 
       if (product.stock <= 0) {
-        window.alert("This product is out of stock.");
+        setToast("Out of stock.");
         return;
       }
 
+      setQrProduct(null);
       setSaleProduct(product);
       setQuantity(1);
     }
@@ -108,6 +113,15 @@ export function EmployeeBillingClient({
     };
   }, [products, selectedShopId]);
 
+  function handleOpenProductQr(product: BillingProduct) {
+    if (product.stock <= 0) {
+      setToast("Out of stock.");
+      return;
+    }
+
+    setQrProduct(product);
+  }
+
   async function confirmSale() {
     if (!saleProduct || quantity < 1 || quantity > saleProduct.stock) {
       return;
@@ -116,13 +130,40 @@ export function EmployeeBillingClient({
     setIsSelling(true);
 
     try {
-      await saleAction(saleProduct.id, quantity);
+      const soldProduct = saleProduct;
+      const soldQuantity = quantity;
+      const result = await saleAction(soldProduct.id, soldQuantity);
+
+      if (!result.success) {
+        setToast("Sale could not be completed. Check available stock.");
+        return;
+      }
+
       setSaleProduct(null);
       setQuantity(1);
+      setToast(
+        `Sold ${soldProduct.productName} - ${currency.format(
+          soldProduct.price * soldQuantity
+        )}`
+      );
     } finally {
       setIsSelling(false);
     }
   }
+
+  useEffect(() => {
+    if (!toast) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setToast(null);
+    }, 3000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [toast]);
 
   return (
     <>
@@ -184,7 +225,7 @@ export function EmployeeBillingClient({
                 <tr>
                   <th className="px-5 py-4">Product</th>
                   <th className="px-5 py-4">Category</th>
-                  <th className="px-5 py-4">Subcategory</th>
+                  <th className="px-5 py-4">Brand</th>
                   <th className="px-5 py-4">Selling Price</th>
                   <th className="px-5 py-4">Stock</th>
                   <th className="px-5 py-4 text-right">Action</th>
@@ -194,13 +235,17 @@ export function EmployeeBillingClient({
               <tbody className="divide-y divide-zinc-100 text-sm">
                 {visibleProducts.length > 0 ? (
                   visibleProducts.map((product) => (
-                    <tr
-                      key={product.id}
-                      className="cursor-pointer transition hover:bg-zinc-50"
-                      onClick={() => {
-                        setQrProduct(product);
-                      }}
-                    >
+                  <tr
+                    key={product.id}
+                    className={`transition hover:bg-zinc-50 ${
+                      product.stock <= 0
+                        ? "cursor-not-allowed opacity-70"
+                        : "cursor-pointer"
+                    }`}
+                    onClick={() => {
+                      handleOpenProductQr(product);
+                    }}
+                  >
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
                           {product.mainImageUrl ? (
@@ -243,7 +288,9 @@ export function EmployeeBillingClient({
                       <td className="px-5 py-4">
                         <span
                           className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                            product.stock <= 5
+                            product.stock <= 0
+                              ? "bg-red-50 text-red-700"
+                              : product.stock <= 5
                               ? "bg-amber-50 text-amber-700"
                               : "bg-emerald-50 text-emerald-700"
                           }`}
@@ -254,10 +301,15 @@ export function EmployeeBillingClient({
                       <td className="px-5 py-4 text-right">
                         <button
                           type="button"
-                          className="inline-flex items-center gap-2 rounded-full border border-zinc-300 px-4 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
+                          aria-disabled={product.stock <= 0}
+                          className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold ${
+                            product.stock <= 0
+                              ? "cursor-not-allowed border-zinc-200 text-zinc-400"
+                              : "border-zinc-300 text-zinc-700 hover:bg-zinc-100"
+                          }`}
                           onClick={(event) => {
                             event.stopPropagation();
-                            setQrProduct(product);
+                            handleOpenProductQr(product);
                           }}
                         >
                           <QrCode className="h-4 w-4" />
@@ -416,13 +468,34 @@ export function EmployeeBillingClient({
               <button
                 type="button"
                 disabled={isSelling || quantity < 1 || quantity > saleProduct.stock}
+                aria-busy={isSelling}
                 className="inline-flex items-center justify-center gap-2 rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
                 onClick={confirmSale}
               >
-                <Check className="h-4 w-4" />
-                Confirm
+                {isSelling ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Confirming...
+                  </>
+                ) : (
+                  <>
+                    <Check className="h-4 w-4" />
+                    Confirm
+                  </>
+                )}
               </button>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {toast ? (
+        <div className="fixed bottom-5 left-1/2 z-[60] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 rounded-2xl bg-zinc-950 px-5 py-4 text-sm font-semibold text-white shadow-2xl">
+          <div className="flex items-center gap-3">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500">
+              <Check className="h-4 w-4" />
+            </span>
+            <span>{toast}</span>
           </div>
         </div>
       ) : null}

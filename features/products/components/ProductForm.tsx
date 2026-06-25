@@ -1,5 +1,6 @@
 "use client";
 
+import { Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 
 import type {
@@ -32,6 +33,9 @@ export function ProductForm({
   const {
     register,
     handleSubmit,
+    formState: {
+      isSubmitting,
+    },
   } = useForm<ProductFormValues>();
 
   return (
@@ -122,9 +126,19 @@ export function ProductForm({
       />
 
       <button
-        className="bg-black text-white px-4 py-2 rounded"
+        type="submit"
+        disabled={isSubmitting}
+        aria-busy={isSubmitting}
+        className="inline-flex items-center justify-center gap-2 rounded bg-black px-4 py-2 text-white disabled:cursor-not-allowed disabled:bg-zinc-300"
       >
-        Save Product
+        {isSubmitting ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Saving product...
+          </>
+        ) : (
+          "Save Product"
+        )}
       </button>
     </form>
   );

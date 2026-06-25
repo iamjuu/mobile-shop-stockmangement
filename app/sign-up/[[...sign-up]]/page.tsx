@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Boxes, ReceiptText, ShieldCheck, Store } from "lucide-react";
 
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { createAuthSession, hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -212,12 +213,12 @@ export default async function Page({ searchParams }: PageProps) {
                 </select>
               </div>
 
-              <button
-                type="submit"
-                className="w-full rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800"
+              <PendingSubmitButton
+                pendingLabel="Creating account..."
+                className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
               >
                 Create Account
-              </button>
+              </PendingSubmitButton>
             </form>
 
             <p className="mt-6 text-center text-sm text-zinc-600">

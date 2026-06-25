@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, X } from "lucide-react";
+import { Loader2, Pencil, X } from "lucide-react";
 
 interface CategoryItem {
   id: string;
@@ -244,9 +244,17 @@ export function CategoryDirectory({
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
+                  aria-busy={isSaving}
+                  className="inline-flex items-center justify-center gap-2 rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
                 >
-                  {isSaving ? "Saving..." : "Save Changes"}
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Changes"
+                  )}
                 </button>
               </div>
             </form>

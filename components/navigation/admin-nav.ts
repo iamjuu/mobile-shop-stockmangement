@@ -6,6 +6,7 @@ import {
   Package,
   Users,
   BarChart3,
+  RefreshCcw,
 } from "lucide-react";
 
 export const adminNavItems = [
@@ -25,7 +26,7 @@ export const adminNavItems = [
     icon: Tags,
   },
   {
-    title: "Subcategories",
+    title: "Brands",
     href: "/admin/subcategories",
     icon: Boxes,
   },
@@ -33,6 +34,11 @@ export const adminNavItems = [
     title: "Products",
     href: "/admin/products",
     icon: Package,
+  },
+  {
+    title: "Exchange",
+    href: "/admin/exchanges",
+    icon: RefreshCcw,
   },
   {
     title: "Employees",

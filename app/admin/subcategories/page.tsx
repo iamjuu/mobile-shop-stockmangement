@@ -1,6 +1,7 @@
 import { Boxes } from "lucide-react";
 import { revalidatePath } from "next/cache";
 
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { CategoryService } from "@/features/categories/services/category.service";
 import { SubCategoryService } from "@/features/subcategories/services/subcategory.service";
 
@@ -47,13 +48,13 @@ export default async function SubcategoriesPage() {
                 Product setup
               </p>
               <h1 className="text-3xl font-semibold">
-                Subcategories
+                Brands
               </h1>
             </div>
           </div>
 
           <p className="mt-4 text-sm leading-6 text-zinc-500">
-            Create subcategories under a category. For example, under
+            Create brands under a category. For example, under
             Electronics you can add Mobiles, Laptops, Chargers, or Accessories.
           </p>
 
@@ -66,7 +67,7 @@ export default async function SubcategoriesPage() {
                 htmlFor="name"
                 className="mb-2 block text-sm font-medium text-zinc-700"
               >
-                Subcategory name
+                Brand name
               </label>
               <input
                 id="name"
@@ -109,17 +110,17 @@ export default async function SubcategoriesPage() {
               </select>
             </div>
 
-            <button
-              type="submit"
+            <PendingSubmitButton
               disabled={categories.length === 0}
-              className="w-full rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
+              pendingLabel="Creating brand..."
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
             >
-              Create Subcategory
-            </button>
+              Create Brand
+            </PendingSubmitButton>
 
             {categories.length === 0 ? (
               <p className="text-sm text-red-600">
-                Create a category before adding subcategories.
+                Create a category before adding brands.
               </p>
             ) : null}
           </form>
@@ -129,10 +130,10 @@ export default async function SubcategoriesPage() {
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 px-5 py-4">
             <div>
               <h2 className="text-lg font-semibold">
-                Subcategory directory
+                Brand directory
               </h2>
               <p className="mt-1 text-sm text-zinc-500">
-                {subcategories.length} subcategories configured
+                {subcategories.length} brands configured
               </p>
             </div>
           </div>
@@ -176,7 +177,7 @@ export default async function SubcategoriesPage() {
                               {subcategory.name}
                             </p>
                             <p className="text-xs text-zinc-500">
-                              Product subcategory
+                              Product brand
                             </p>
                           </div>
                         </div>
@@ -209,7 +210,7 @@ export default async function SubcategoriesPage() {
                       colSpan={5}
                       className="px-5 py-12 text-center text-sm text-zinc-500"
                     >
-                      No subcategories found. Add one under an existing category.
+                      No brands found. Add one under an existing category.
                     </td>
                   </tr>
                 )}

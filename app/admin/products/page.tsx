@@ -228,6 +228,7 @@ export default async function ProductsPage() {
     id: product.id,
     productCode: product.productCode,
     productName: product.productName,
+    source: product.source ?? "REGULAR",
     shopName: product.shop.shopName,
     categoryName: product.category.name,
     subcategoryName: product.subcategory.name,
@@ -259,7 +260,7 @@ export default async function ProductsPage() {
 
           <p className="mt-4 text-sm leading-6 text-zinc-500">
             Add products by selecting the shop first. Categories are filtered
-            by the shop, and subcategories are filtered by the selected category.
+            by the shop, and brands are filtered by the selected category.
           </p>
 
           <ProductCreateForm

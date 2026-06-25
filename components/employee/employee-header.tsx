@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { clearAuthSession } from "@/lib/auth";
 import { MobileScannerButton } from "./mobile-scanner-button";
 
@@ -31,12 +32,12 @@ export function EmployeeHeader({
           <MobileScannerButton />
 
           <form action={logout}>
-            <button
-              type="submit"
-              className="rounded-full border border-zinc-300 bg-white px-5 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+            <PendingSubmitButton
+              pendingLabel="Logging out..."
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-zinc-300 bg-white px-5 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:bg-zinc-100"
             >
               Logout
-            </button>
+            </PendingSubmitButton>
           </form>
         </div>
       </div>

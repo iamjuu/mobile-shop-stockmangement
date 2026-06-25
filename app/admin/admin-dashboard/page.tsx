@@ -22,6 +22,7 @@ export default async function DashboardPage() {
     totalProducts,
     totalEmployees,
     totalCategories,
+    totalExchanges,
     totalStockResult,
     lowStockItems,
     shops,
@@ -35,6 +36,7 @@ export default async function DashboardPage() {
       },
     }),
     prisma.category.count(),
+    prisma.exchange.count(),
     prisma.product.aggregate({
       _sum: {
         stock: true,
@@ -100,8 +102,8 @@ export default async function DashboardPage() {
     },
     {
       label: "Exchange",
-      value: "0",
-      detail: "Next phase data",
+      value: formatter.format(totalExchanges),
+      detail: "Completed exchanges",
       icon: RefreshCcw,
     },
   ];

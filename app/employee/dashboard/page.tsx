@@ -1,5 +1,12 @@
 import Link from "next/link";
-import { ArrowUpRight, type LucideIcon, Package, ReceiptText, Store } from "lucide-react";
+import {
+  ArrowUpRight,
+  type LucideIcon,
+  Package,
+  ReceiptText,
+  RefreshCcw,
+  Store,
+} from "lucide-react";
 
 import { getCurrentUser } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
@@ -15,10 +22,20 @@ export default async function EmployeeDashboard() {
 
   const [
     todaySales,
+    recentExchanges,
     totalProducts,
     totalShops,
   ] = await Promise.all([
     prisma.sale.findMany({
+      where: {
+        employeeId,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: 5,
+    }),
+    prisma.exchange.findMany({
       where: {
         employeeId,
       },
@@ -58,6 +75,12 @@ export default async function EmployeeDashboard() {
       icon: Store,
     },
     {
+      label: "Exchanges",
+      value: recentExchanges.length,
+      detail: "Recent exchange records",
+      icon: RefreshCcw,
+    },
+    {
       label: "Sold Items",
       value: soldQuantity,
       detail: "Recent employee sales",
@@ -88,7 +111,7 @@ export default async function EmployeeDashboard() {
         </Link>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid gap-4 md:grid-cols-4">
         {stats.map((stat) => {
           const StatIcon = stat.icon;
 
