@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { Download, Loader2, Pencil, Printer, Trash2, X } from "lucide-react";
+import { Download, Loader2, Pencil, Plus, Printer, Trash2, X } from "lucide-react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 import { QRPreview } from "./QRPreview";
 
@@ -22,6 +23,10 @@ interface ProductDirectoryItem {
   description?: string | null;
 }
 
+type ProductDirectoryRow = ProductDirectoryItem & {
+  recordCount: number;
+};
+
 interface ProductDirectoryProps {
   products: ProductDirectoryItem[];
   updateAction: (
@@ -40,6 +45,11 @@ interface ProductDirectoryProps {
   deleteAction: (productId: string) => Promise<{
     ok: boolean;
     message: string;
+  }>;
+  duplicateAction: (productId: string) => Promise<{
+    ok: boolean;
+    message: string;
+    product?: ProductDirectoryItem;
   }>;
 }
 
@@ -61,7 +71,10 @@ export function ProductDirectory({
   products,
   updateAction,
   deleteAction,
+  duplicateAction,
 }: ProductDirectoryProps) {
+  const router = useRouter();
+  const [localProducts, setLocalProducts] = useState(products);
   const [selectedProduct, setSelectedProduct] =
     useState<ProductDirectoryItem | null>(null);
   const [editProduct, setEditProduct] =
@@ -69,8 +82,9 @@ export function ProductDirectory({
   const [toast, setToast] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
+  const [duplicatingProductId, setDuplicatingProductId] = useState<string | null>(null);
   const [sourceFilter, setSourceFilter] =
-    useState<"ALL" | "REGULAR" | "EXCHANGE_THIRD_PARTY">("ALL");
+    useState<"ALL" | "REGULAR" | "EXCHANGE_THIRD_PARTY">("REGULAR");
   const qrRef = useRef<HTMLDivElement>(null);
 
   const qrValue = useMemo(() => {
@@ -91,13 +105,53 @@ export function ProductDirectory({
     });
   }, [selectedProduct]);
   const visibleProducts = useMemo(
-    () =>
-      products.filter(
+    () => {
+      const filteredProducts = localProducts.filter(
         (product) =>
           sourceFilter === "ALL" ||
           (product.source ?? "REGULAR") === sourceFilter
-      ),
-    [products, sourceFilter]
+      );
+      const groupedProducts = new Map<string, ProductDirectoryRow>();
+
+      filteredProducts.forEach((product) => {
+        const source = product.source ?? "REGULAR";
+        const groupKey =
+          source === "EXCHANGE_THIRD_PARTY"
+            ? product.id
+            : [
+                source,
+                product.productName.trim().toLowerCase(),
+                product.shopName,
+                product.categoryName,
+                product.subcategoryName,
+                product.purchasePrice ?? 0,
+                product.price,
+                product.mainImageUrl ?? "",
+                product.description ?? "",
+              ].join("|");
+        const existingProduct = groupedProducts.get(groupKey);
+
+        if (!existingProduct) {
+          groupedProducts.set(groupKey, {
+            ...product,
+            recordCount: 1,
+          });
+          return;
+        }
+
+        const shouldUseThisProduct =
+          existingProduct.stock <= 0 && product.stock > 0;
+
+        groupedProducts.set(groupKey, {
+          ...(shouldUseThisProduct ? product : existingProduct),
+          stock: existingProduct.stock + product.stock,
+          recordCount: existingProduct.recordCount + 1,
+        });
+      });
+
+      return Array.from(groupedProducts.values());
+    },
+    [localProducts, sourceFilter]
   );
 
   function getQrSvgMarkup() {
@@ -133,6 +187,7 @@ export function ProductDirectory({
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
+    setSelectedProduct(null);
   }
 
   function handlePrintQr() {
@@ -223,6 +278,7 @@ export function ProductDirectory({
       </html>
     `);
     printWindow.document.close();
+    setSelectedProduct(null);
   }
 
   function showToast(message: string) {
@@ -255,8 +311,49 @@ export function ProductDirectory({
     try {
       const result = await deleteAction(product.id);
       showToast(result.message);
+
+      if (result.ok) {
+        setLocalProducts((currentProducts) =>
+          currentProducts.filter(
+            (currentProduct) => currentProduct.id !== product.id
+          )
+        );
+        setSelectedProduct((currentProduct) =>
+          currentProduct?.id === product.id ? null : currentProduct
+        );
+        setEditProduct((currentProduct) =>
+          currentProduct?.id === product.id ? null : currentProduct
+        );
+        router.refresh();
+      }
     } finally {
       setDeletingProductId(null);
+    }
+  }
+
+  async function handleDuplicateProduct(product: ProductDirectoryItem) {
+    if ((product.source ?? "REGULAR") !== "REGULAR") {
+      showToast("Only regular products can be added this way.");
+      return;
+    }
+
+    setDuplicatingProductId(product.id);
+
+    try {
+      const result = await duplicateAction(product.id);
+      showToast(result.message);
+
+      if (result.ok && result.product) {
+        setLocalProducts((currentProducts) => [
+          result.product as ProductDirectoryItem,
+          ...currentProducts,
+        ]);
+        setSourceFilter("REGULAR");
+        setSelectedProduct(result.product);
+        router.refresh();
+      }
+    } finally {
+      setDuplicatingProductId(null);
     }
   }
 
@@ -268,18 +365,33 @@ export function ProductDirectory({
     setIsSaving(true);
 
     try {
-      const result = await updateAction(editProduct.id, {
+      const updatedProduct = {
         productName: String(formData.get("productName") ?? ""),
         purchasePrice: Number(formData.get("purchasePrice") ?? 0),
         price: Number(formData.get("price") ?? 0),
         stock: Number(formData.get("stock") ?? 0),
         description: String(formData.get("description") ?? ""),
-      });
+      };
+      const result = await updateAction(editProduct.id, updatedProduct);
 
       showToast(result.message);
 
       if (result.ok) {
+        setLocalProducts((currentProducts) =>
+          currentProducts.map((product) =>
+            product.id === editProduct.id
+              ? {
+                  ...product,
+                  ...updatedProduct,
+                  productName: updatedProduct.productName.trim(),
+                  stock: Math.trunc(updatedProduct.stock),
+                  description: updatedProduct.description.trim() || null,
+                }
+              : product
+          )
+        );
         setEditProduct(null);
+        router.refresh();
       }
     } finally {
       setIsSaving(false);
@@ -295,7 +407,7 @@ export function ProductDirectory({
               Product directory
             </h2>
             <p className="mt-1 text-sm text-zinc-500">
-              {products.length} products configured
+              {visibleProducts.length} products shown
             </p>
           </div>
           <div className="flex rounded-full bg-zinc-100 p-1">
@@ -380,6 +492,11 @@ export function ProductDirectory({
                             <p className="text-xs text-zinc-500">
                               {product.productCode}
                             </p>
+                            {product.recordCount > 1 ? (
+                              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-zinc-600">
+                                {product.recordCount} records
+                              </span>
+                            ) : null}
                             {(product.source ?? "REGULAR") ===
                             "EXCHANGE_THIRD_PARTY" ? (
                               <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-700">
@@ -425,6 +542,25 @@ export function ProductDirectory({
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex justify-end gap-2">
+                        {(product.source ?? "REGULAR") === "REGULAR" ? (
+                          <button
+                            type="button"
+                            disabled={duplicatingProductId === product.id}
+                            aria-busy={duplicatingProductId === product.id}
+                            className="inline-flex items-center gap-1 rounded-full border border-zinc-300 px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:text-zinc-400"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleDuplicateProduct(product);
+                            }}
+                          >
+                            {duplicatingProductId === product.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Plus className="h-3.5 w-3.5" />
+                            )}
+                            Add Product
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           aria-disabled={product.stock <= 0}

@@ -3,6 +3,10 @@ import { revalidatePath } from "next/cache";
 import { EmployeeExchangeClient } from "@/features/products/components/EmployeeExchangeClient";
 import { generateProductCode } from "@/features/products/utils/product-code";
 import { getCurrentUserId } from "@/lib/auth";
+import {
+  deleteCloudinaryAssets,
+  uploadImageFile,
+} from "@/lib/cloudinary";
 import { prisma } from "@/lib/prisma";
 
 const MAX_IMAGE_SIZE_BYTES = 2 * 1024 * 1024;
@@ -13,12 +17,6 @@ function isUploadedFile(value: FormDataEntryValue | null): value is File {
 
 function isValidImage(file: File) {
   return file.type.startsWith("image/") && file.size <= MAX_IMAGE_SIZE_BYTES;
-}
-
-async function fileToDataUrl(file: File) {
-  const buffer = Buffer.from(await file.arrayBuffer());
-
-  return `data:${file.type};base64,${buffer.toString("base64")}`;
 }
 
 export default async function ExchangePage() {
@@ -118,9 +116,18 @@ export default async function ExchangePage() {
       };
     }
 
-    const imageUrl = await fileToDataUrl(receivedImage);
+    let imageUpload: {
+      secureUrl: string;
+      publicId: string;
+    } | null = null;
 
     try {
+      const uploadedImage = await uploadImageFile(
+        receivedImage,
+        "stock-management/exchanges"
+      );
+      imageUpload = uploadedImage;
+
       await prisma.$transaction(async (tx) => {
         const soldProduct = await tx.product.findUnique({
           where: {
@@ -195,8 +202,8 @@ export default async function ExchangePage() {
             price: receivedPrice,
             stock: 1,
             source: "EXCHANGE_THIRD_PARTY",
-            imageUrl,
-            mainImageUrl: imageUrl,
+            imageUrl: uploadedImage.secureUrl,
+            mainImageUrl: uploadedImage.secureUrl,
             galleryImageUrls: [],
             description: notes || condition || null,
           },
@@ -234,6 +241,10 @@ export default async function ExchangePage() {
         });
       });
     } catch {
+      if (imageUpload) {
+        await deleteCloudinaryAssets([imageUpload.publicId]);
+      }
+
       return {
         success: false,
         message: "Exchange could not be completed. Check stock and category details.",

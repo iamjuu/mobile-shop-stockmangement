@@ -6,8 +6,13 @@ import { ProductCreateForm } from "@/features/products/components/ProductCreateF
 import { ProductDirectory } from "@/features/products/components/ProductDirectory";
 import { productSchema } from "@/features/products/schemas/product.schema";
 import { ProductService } from "@/features/products/services/product.service";
+import { generateProductCode } from "@/features/products/utils/product-code";
 import { ShopService } from "@/features/shops/services/shop.service";
 import { SubCategoryService } from "@/features/subcategories/services/subcategory.service";
+import {
+  deleteCloudinaryAssets,
+  uploadImageFile,
+} from "@/lib/cloudinary";
 import { prisma } from "@/lib/prisma";
 
 const MAX_IMAGE_SIZE_BYTES = 2 * 1024 * 1024;
@@ -18,12 +23,6 @@ function isUploadedFile(value: FormDataEntryValue | null): value is File {
 
 function isValidImage(file: File) {
   return file.type.startsWith("image/") && file.size <= MAX_IMAGE_SIZE_BYTES;
-}
-
-async function fileToDataUrl(file: File) {
-  const buffer = Buffer.from(await file.arrayBuffer());
-
-  return `data:${file.type};base64,${buffer.toString("base64")}`;
 }
 
 export default async function ProductsPage() {
@@ -113,17 +112,45 @@ export default async function ProductsPage() {
     }
 
     const service = new ProductService();
-    const mainImageUrl = await fileToDataUrl(mainImage);
-    const galleryImageUrls = await Promise.all(
-      galleryImages.map((file) => fileToDataUrl(file))
-    );
+    const uploadedImages: Array<{
+      secureUrl: string;
+      publicId: string;
+    }> = [];
 
-    await service.create({
-      ...parsed.data,
-      imageUrl: mainImageUrl,
-      mainImageUrl,
-      galleryImageUrls,
-    });
+    try {
+      const mainImageUpload = await uploadImageFile(
+        mainImage,
+        "stock-management/products"
+      );
+      uploadedImages.push(mainImageUpload);
+
+      for (const galleryImage of galleryImages) {
+        const galleryImageUpload = await uploadImageFile(
+          galleryImage,
+          "stock-management/products"
+        );
+
+        uploadedImages.push(galleryImageUpload);
+      }
+
+      const mainImageUrl = mainImageUpload.secureUrl;
+      const galleryImageUrls = uploadedImages
+        .slice(1)
+        .map((image) => image.secureUrl);
+
+      await service.create({
+        ...parsed.data,
+        imageUrl: mainImageUrl,
+        mainImageUrl,
+        galleryImageUrls,
+      });
+    } catch {
+      await deleteCloudinaryAssets(
+        uploadedImages.map((image) => image.publicId)
+      );
+
+      return;
+    }
 
     revalidatePath("/admin/products");
     revalidatePath("/admin/admin-dashboard");
@@ -205,6 +232,85 @@ export default async function ProductsPage() {
     };
   }
 
+  async function duplicateProduct(productId: string) {
+    "use server";
+
+    if (!productId) {
+      return {
+        ok: false,
+        message: "Invalid product.",
+      };
+    }
+
+    const product = await prisma.product.findUnique({
+      where: {
+        id: productId,
+      },
+      include: {
+        shop: true,
+        category: true,
+        subcategory: true,
+      },
+    });
+
+    if (!product) {
+      return {
+        ok: false,
+        message: "Product not found.",
+      };
+    }
+
+    const newProduct = await prisma.product.create({
+      data: {
+        productCode: generateProductCode(),
+        productName: product.productName,
+        shopId: product.shopId,
+        categoryId: product.categoryId,
+        subcategoryId: product.subcategoryId,
+        purchasePrice: product.purchasePrice,
+        price: product.price,
+        stock: 1,
+        source: product.source ?? "REGULAR",
+        imageUrl: product.imageUrl,
+        mainImageUrl: product.mainImageUrl,
+        galleryImageUrls: product.galleryImageUrls,
+        description: product.description,
+        qrCode: product.qrCode,
+        barcode: product.barcode,
+      },
+      include: {
+        shop: true,
+        category: true,
+        subcategory: true,
+      },
+    });
+
+    revalidatePath("/admin/products");
+    revalidatePath("/admin/admin-dashboard");
+    revalidatePath("/employee/billing");
+    revalidatePath("/employee/exchange");
+
+    return {
+      ok: true,
+      message: "Product added successfully.",
+      product: {
+        id: newProduct.id,
+        productCode: newProduct.productCode,
+        productName: newProduct.productName,
+        source: newProduct.source ?? "REGULAR",
+        shopName: newProduct.shop.shopName,
+        categoryName: newProduct.category.name,
+        subcategoryName: newProduct.subcategory.name,
+        purchasePrice: newProduct.purchasePrice,
+        price: newProduct.price,
+        stock: newProduct.stock,
+        mainImageUrl: newProduct.mainImageUrl ?? newProduct.imageUrl,
+        galleryImageUrls: newProduct.galleryImageUrls,
+        description: newProduct.description,
+      },
+    };
+  }
+
   const formShops = shops.map((shop) => ({
     id: shop.id,
     shopName: shop.shopName,
@@ -272,9 +378,11 @@ export default async function ProductsPage() {
         </section>
 
         <ProductDirectory
+          key={directoryProducts.map((product) => product.id).join("|")}
           products={directoryProducts}
           updateAction={updateProduct}
           deleteAction={deleteProduct}
+          duplicateAction={duplicateProduct}
         />
       </div>
     </div>

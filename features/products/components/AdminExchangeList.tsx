@@ -42,12 +42,9 @@ const currency = new Intl.NumberFormat("en-IN", {
 });
 
 export function AdminExchangeList({ exchanges }: AdminExchangeListProps) {
-  const [selectedId, setSelectedId] = useState(exchanges[0]?.id ?? "");
+  const [selectedId, setSelectedId] = useState("");
   const selectedExchange = useMemo(
-    () =>
-      exchanges.find((exchange) => exchange.id === selectedId) ??
-      exchanges[0] ??
-      null,
+    () => exchanges.find((exchange) => exchange.id === selectedId) ?? null,
     [exchanges, selectedId]
   );
 
@@ -61,8 +58,18 @@ export function AdminExchangeList({ exchanges }: AdminExchangeListProps) {
       </div>
 
       {exchanges.length > 0 ? (
-        <div className="grid min-h-[520px] xl:grid-cols-[minmax(0,1fr)_520px]">
-          <div className="overflow-x-auto border-b border-zinc-200 xl:border-b-0 xl:border-r">
+        <div
+          className={`grid min-h-[520px] ${
+            selectedExchange ? "xl:grid-cols-[minmax(0,1fr)_520px]" : ""
+          }`}
+        >
+          <div
+            className={`overflow-x-auto ${
+              selectedExchange
+                ? "border-b border-zinc-200 xl:border-b-0 xl:border-r"
+                : ""
+            }`}
+          >
             <table className="w-full min-w-[980px] border-collapse text-left">
               <thead className="bg-zinc-50 text-xs font-semibold uppercase tracking-wide text-zinc-500">
                 <tr>
@@ -82,12 +89,9 @@ export function AdminExchangeList({ exchanges }: AdminExchangeListProps) {
                   return (
                     <tr
                       key={exchange.id}
-                      className={`cursor-pointer transition ${
+                      className={`transition ${
                         isSelected ? "bg-zinc-100" : "hover:bg-zinc-50"
                       }`}
-                      onClick={() => {
-                        setSelectedId(exchange.id);
-                      }}
                     >
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
@@ -139,10 +143,16 @@ export function AdminExchangeList({ exchanges }: AdminExchangeListProps) {
                         {currency.format(exchange.cashBalance)}
                       </td>
                       <td className="px-5 py-4 text-right">
-                        <span className="inline-flex items-center gap-1 rounded-full border border-zinc-300 px-3 py-2 text-xs font-semibold text-zinc-700">
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 rounded-full border border-zinc-300 px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-white"
+                          onClick={() => {
+                            setSelectedId(exchange.id);
+                          }}
+                        >
                           View
                           <ChevronRight className="h-3.5 w-3.5" />
-                        </span>
+                        </button>
                       </td>
                     </tr>
                   );
@@ -164,7 +174,7 @@ export function AdminExchangeList({ exchanges }: AdminExchangeListProps) {
                 </div>
                 <button
                   type="button"
-                  className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-300 hover:bg-zinc-50 xl:hidden"
+                  className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-300 hover:bg-zinc-50"
                   onClick={() => {
                     setSelectedId("");
                   }}
