@@ -174,7 +174,7 @@ export function EmployeeBillingClient({
               <p className="text-sm font-medium text-zinc-500">
                 Billing workflow
               </p>
-              <h1 className="mt-1 text-3xl font-semibold">
+              <h1 className="mt-1 text-xl font-medium">
                 Choose shop and sell products
               </h1>
             </div>

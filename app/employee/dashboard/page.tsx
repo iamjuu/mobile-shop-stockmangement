@@ -128,7 +128,7 @@ export default async function EmployeeDashboard() {
                   <StatIcon className="h-5 w-5" />
                 </div>
               </div>
-              <p className="mt-5 text-4xl font-semibold">{stat.value}</p>
+              <p className="mt-5 text-2xl font-semibold">{stat.value}</p>
               <p className="mt-2 text-sm text-zinc-500">{stat.detail}</p>
             </div>
           );

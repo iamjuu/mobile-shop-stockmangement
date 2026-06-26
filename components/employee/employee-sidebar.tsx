@@ -13,7 +13,7 @@ export function EmployeeSidebar() {
       <div className="flex w-full flex-col gap-4 lg:flex-row lg:justify-between">
         <Link
           href="/employee/dashboard"
-          className="inline-flex w-fit items-center rounded-full border border-zinc-300 bg-white px-4 py-2 text-xl font-semibold"
+          className="inline-flex w-fit items-center rounded-full border border-zinc-300 bg-white px-4 py-2 text-xl font-medium"
         >
           Employee Panel
         </Link>
