@@ -327,7 +327,7 @@ export function EmployeeExchangeClient({
                 </label>
                 <button
                   type="button"
-                  className="text-xs font-semibold text-zinc-950"
+                  className="rounded-full border border-zinc-300 bg-zinc-950 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-950 focus:ring-offset-2"
                   onClick={() => {
                     setCategoryMode(
                       categoryMode === "existing" ? "new" : "existing"
@@ -377,7 +377,7 @@ export function EmployeeExchangeClient({
                 </label>
                 <button
                   type="button"
-                  className="text-xs font-semibold text-zinc-950"
+                  className="rounded-full border border-zinc-300 bg-zinc-950 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-950 focus:ring-offset-2"
                   onClick={() => {
                     setSubcategoryMode(
                       subcategoryMode === "existing" ? "new" : "existing"
