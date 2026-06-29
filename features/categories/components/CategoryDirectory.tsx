@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Loader2, Pencil, X } from "lucide-react";
+
+import { TablePagination } from "@/components/table-pagination";
 
 interface CategoryItem {
   id: string;
@@ -31,6 +33,8 @@ interface CategoryDirectoryProps {
   }>;
 }
 
+const PAGE_SIZE = 7;
+
 export function CategoryDirectory({
   categories,
   shops,
@@ -39,6 +43,15 @@ export function CategoryDirectory({
   const [editCategory, setEditCategory] = useState<CategoryItem | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const paginatedCategories = useMemo(
+    () =>
+      categories.slice(
+        (currentPage - 1) * PAGE_SIZE,
+        currentPage * PAGE_SIZE
+      ),
+    [categories, currentPage]
+  );
 
   function showToast(message: string) {
     setToast(message);
@@ -100,7 +113,7 @@ export function CategoryDirectory({
 
             <tbody className="divide-y divide-zinc-100 text-sm">
               {categories.length > 0 ? (
-                categories.map((category) => (
+                paginatedCategories.map((category) => (
                   <tr
                     key={category.id}
                     className="transition hover:bg-zinc-50"
@@ -160,6 +173,12 @@ export function CategoryDirectory({
             </tbody>
           </table>
         </div>
+        <TablePagination
+          currentPage={currentPage}
+          pageSize={PAGE_SIZE}
+          totalItems={categories.length}
+          onPageChange={setCurrentPage}
+        />
       </section>
 
       {editCategory ? (

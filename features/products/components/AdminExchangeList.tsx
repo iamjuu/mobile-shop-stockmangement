@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { ChevronRight, X } from "lucide-react";
 import Image from "next/image";
 
+import { TablePagination } from "@/components/table-pagination";
+
 interface AdminExchangeItem {
   id: string;
   receivedProductName: string;
@@ -40,12 +42,19 @@ const currency = new Intl.NumberFormat("en-IN", {
   currency: "INR",
   style: "currency",
 });
+const PAGE_SIZE = 7;
 
 export function AdminExchangeList({ exchanges }: AdminExchangeListProps) {
   const [selectedId, setSelectedId] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const selectedExchange = useMemo(
     () => exchanges.find((exchange) => exchange.id === selectedId) ?? null,
     [exchanges, selectedId]
+  );
+  const paginatedExchanges = useMemo(
+    () =>
+      exchanges.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [currentPage, exchanges]
   );
 
   return (
@@ -83,7 +92,7 @@ export function AdminExchangeList({ exchanges }: AdminExchangeListProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 text-sm">
-                {exchanges.map((exchange) => {
+                {paginatedExchanges.map((exchange) => {
                   const isSelected = exchange.id === selectedExchange?.id;
 
                   return (
@@ -159,6 +168,12 @@ export function AdminExchangeList({ exchanges }: AdminExchangeListProps) {
                 })}
               </tbody>
             </table>
+            <TablePagination
+              currentPage={currentPage}
+              pageSize={PAGE_SIZE}
+              totalItems={exchanges.length}
+              onPageChange={setCurrentPage}
+            />
           </div>
 
           {selectedExchange ? (

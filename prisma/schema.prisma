@@ -162,8 +162,14 @@ model Sale {
 
   unitPrice     Float
   purchasePrice Float?
+  discount      Float  @default(0)
   totalAmount   Float
   profit        Float
+  proofType     String?
+  proofFrontImageUrl  String?
+  proofBackImageUrl   String?
+  proofFrontPublicId  String?
+  proofBackPublicId   String?
 
   employee User    @relation(fields: [employeeId], references: [id])
   product  Product @relation(fields: [productId], references: [id])

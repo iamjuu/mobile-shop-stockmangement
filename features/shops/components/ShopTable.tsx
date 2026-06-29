@@ -1,3 +1,10 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import Link from "next/link";
+
+import { TablePagination } from "@/components/table-pagination";
+
 import { ShopActions } from "./ShopActions";
 
 interface Shop {
@@ -11,9 +18,15 @@ interface Props {
   shops: Shop[];
 }
 
-export function ShopTable({
-  shops,
-}: Props) {
+const PAGE_SIZE = 7;
+
+export function ShopTable({ shops }: Props) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const paginatedShops = useMemo(
+    () => shops.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [currentPage, shops]
+  );
+
   return (
     <div className="overflow-hidden rounded-[24px] border border-zinc-200 bg-white">
       <div className="border-b border-zinc-200 px-5 py-4">
@@ -46,7 +59,7 @@ export function ShopTable({
 
           <tbody className="divide-y divide-zinc-100 text-sm">
             {shops.length > 0 ? (
-              shops.map((shop) => (
+              paginatedShops.map((shop) => (
                 <tr
                   key={shop.id}
                   className="transition hover:bg-zinc-50"
@@ -58,7 +71,12 @@ export function ShopTable({
                       </div>
                       <div>
                         <p className="font-medium text-zinc-950">
-                          {shop.shopName}
+                          <Link
+                            href={`/admin/shops/${shop.id}`}
+                            className="hover:underline"
+                          >
+                            {shop.shopName}
+                          </Link>
                         </p>
                         <p className="text-xs text-zinc-500">
                           Branch record
@@ -94,6 +112,12 @@ export function ShopTable({
           </tbody>
         </table>
       </div>
+      <TablePagination
+        currentPage={currentPage}
+        pageSize={PAGE_SIZE}
+        totalItems={shops.length}
+        onPageChange={setCurrentPage}
+      />
     </div>
   );
 }

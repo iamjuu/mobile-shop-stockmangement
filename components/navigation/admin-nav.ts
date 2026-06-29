@@ -4,6 +4,7 @@ import {
   Tags,
   Boxes,
   Package,
+  PlusCircle,
   Users,
   BarChart3,
   RefreshCcw,
@@ -31,8 +32,13 @@ export const adminNavItems = [
     icon: Boxes,
   },
   {
-    title: "Products",
+    title: "Add Product",
     href: "/admin/products",
+    icon: PlusCircle,
+  },
+  {
+    title: "Product",
+    href: "/admin/product-catalog",
     icon: Package,
   },
   {

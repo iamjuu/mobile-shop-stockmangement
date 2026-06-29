@@ -17,7 +17,7 @@ export function EmployeeLayout({
       <EmployeeSidebar />
       <EmployeeHeader userName={userName} />
 
-      <main className="w-full p-[10px]">
+      <main className="w-full px-3 py-4 sm:p-[10px]">
         {children}
       </main>
     </div>

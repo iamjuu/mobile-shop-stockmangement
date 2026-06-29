@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   ArrowUpRight,
   Boxes,
+  IndianRupee,
   Package,
   RefreshCcw,
   ReceiptText,
@@ -15,6 +16,11 @@ import {
 import { prisma } from "@/lib/prisma";
 
 const formatter = new Intl.NumberFormat("en-IN");
+const currency = new Intl.NumberFormat("en-IN", {
+  currency: "INR",
+  maximumFractionDigits: 0,
+  style: "currency",
+});
 
 export default async function DashboardPage() {
   const [
@@ -27,6 +33,7 @@ export default async function DashboardPage() {
     lowStockItems,
     shops,
     availableStockProducts,
+    totalProfitResult,
   ] = await Promise.all([
     prisma.shop.count(),
     prisma.product.count(),
@@ -71,9 +78,15 @@ export default async function DashboardPage() {
       },
       take: 6,
     }),
+    prisma.sale.aggregate({
+      _sum: {
+        profit: true,
+      },
+    }),
   ]);
 
   const totalStock = totalStockResult._sum.stock ?? 0;
+  const totalProfit = totalProfitResult._sum.profit ?? 0;
 
   const stats = [
     {
@@ -99,6 +112,12 @@ export default async function DashboardPage() {
       value: formatter.format(totalEmployees),
       detail: "Billing users",
       icon: Users,
+    },
+    {
+      label: "Profit",
+      value: currency.format(totalProfit),
+      detail: "Total billing profit",
+      icon: IndianRupee,
     },
     {
       label: "Exchange",
@@ -197,7 +216,7 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
         {stats.map((stat) => {
           const Icon = stat.icon;
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Check, Loader2, RefreshCcw } from "lucide-react";
 import Image from "next/image";
 
@@ -67,6 +67,7 @@ export function EmployeeExchangeClient({
   const [exchangeValue, setExchangeValue] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const submitLockedRef = useRef(false);
 
   const shopProducts = useMemo(
     () => products.filter((product) => product.shopId === shopId),
@@ -121,8 +122,13 @@ export function EmployeeExchangeClient({
     (subcategoryMode === "existing" && !activeSubcategoryId);
 
   async function handleSubmit(formData: FormData) {
+    if (submitLockedRef.current) {
+      return;
+    }
+
+    submitLockedRef.current = true;
     setIsSubmitting(true);
-    setMessage(null);
+    setMessage("Saving exchange...");
 
     try {
       formData.set("shopId", shopId);
@@ -145,6 +151,7 @@ export function EmployeeExchangeClient({
         setExchangeValue(0);
       }
     } finally {
+      submitLockedRef.current = false;
       setIsSubmitting(false);
     }
   }
@@ -170,6 +177,10 @@ export function EmployeeExchangeClient({
         className="grid gap-5 xl:grid-cols-[1fr_420px]"
       >
         <section className="space-y-5 rounded-[24px] border border-zinc-200 bg-white p-5">
+          <fieldset
+            disabled={isSubmitting}
+            className="space-y-5 disabled:pointer-events-none disabled:opacity-70"
+          >
           <div>
             <h2 className="text-xl font-semibold">Product customer buys</h2>
             <p className="mt-1 text-sm text-zinc-500">
@@ -508,6 +519,7 @@ export function EmployeeExchangeClient({
               className="w-full resize-none rounded-3xl border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-950"
             />
           </div>
+          </fieldset>
         </section>
 
         <aside className="h-fit rounded-[24px] border border-zinc-200 bg-white p-5">
@@ -529,8 +541,20 @@ export function EmployeeExchangeClient({
           </div>
 
           {message ? (
-            <div className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm font-medium">
-              {message}
+            <div
+              className={`mt-4 rounded-2xl border px-4 py-3 text-sm font-medium ${
+                isSubmitting
+                  ? "border-amber-200 bg-amber-50 text-amber-800"
+                  : "border-zinc-200 bg-zinc-50"
+              }`}
+              aria-live="polite"
+            >
+              <div className="flex items-center gap-2">
+                {isSubmitting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : null}
+                <span>{message}</span>
+              </div>
             </div>
           ) : null}
 

@@ -359,7 +359,7 @@ export default async function ProductsPage() {
                 Inventory setup
               </p>
               <h1 className="text-3xl font-semibold">
-                Products
+                Add Product
               </h1>
             </div>
           </div>

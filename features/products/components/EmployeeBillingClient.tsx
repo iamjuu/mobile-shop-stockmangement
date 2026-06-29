@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Check, Loader2, QrCode, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, IdCard, Loader2, QrCode, X } from "lucide-react";
 import Image from "next/image";
 
 import { QRPreview } from "./QRPreview";
@@ -28,16 +28,18 @@ interface BillingProduct {
 interface EmployeeBillingClientProps {
   shops: ShopOption[];
   products: BillingProduct[];
-  saleAction: (
-    productId: string,
-    quantity: number
-  ) => Promise<{ success: boolean }>;
+  saleAction: (formData: FormData) => Promise<{ success: boolean }>;
 }
 
 const currency = new Intl.NumberFormat("en-IN", {
   currency: "INR",
   style: "currency",
 });
+const proofTypes = [
+  ["AADHAAR", "Aadhaar"],
+  ["DRIVING_LICENCE", "Driving Licence"],
+  ["VOTER_ID", "Voter ID"],
+] as const;
 
 function getProductCodeFromScan(value: string) {
   try {
@@ -73,8 +75,13 @@ export function EmployeeBillingClient({
   const [qrProduct, setQrProduct] = useState<BillingProduct | null>(null);
   const [saleProduct, setSaleProduct] = useState<BillingProduct | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [discount, setDiscount] = useState(0);
+  const [proofType, setProofType] = useState<(typeof proofTypes)[number][0]>(
+    "AADHAAR"
+  );
   const [isSelling, setIsSelling] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const saleLockedRef = useRef(false);
 
   const visibleProducts = useMemo(
     () => products.filter((product) => product.shopId === selectedShopId),
@@ -104,6 +111,8 @@ export function EmployeeBillingClient({
       setQrProduct(null);
       setSaleProduct(product);
       setQuantity(1);
+      setDiscount(0);
+      setProofType("AADHAAR");
     }
 
     window.addEventListener("employee-product-scan", handleScan);
@@ -122,31 +131,49 @@ export function EmployeeBillingClient({
     setQrProduct(product);
   }
 
-  async function confirmSale() {
-    if (!saleProduct || quantity < 1 || quantity > saleProduct.stock) {
+  async function confirmSale(formData: FormData) {
+    if (saleLockedRef.current) {
       return;
     }
 
+    if (
+      !saleProduct ||
+      quantity < 1 ||
+      quantity > saleProduct.stock ||
+      discount > saleProduct.price * quantity
+    ) {
+      return;
+    }
+
+    saleLockedRef.current = true;
     setIsSelling(true);
 
     try {
       const soldProduct = saleProduct;
       const soldQuantity = quantity;
-      const result = await saleAction(soldProduct.id, soldQuantity);
+      const saleDiscount = discount;
+
+      formData.set("productId", soldProduct.id);
+      formData.set("quantity", String(soldQuantity));
+      formData.set("discount", String(saleDiscount));
+      const result = await saleAction(formData);
 
       if (!result.success) {
-        setToast("Sale could not be completed. Check available stock.");
+        setToast("Sale could not be completed. Check stock, proof images, and discount.");
         return;
       }
 
       setSaleProduct(null);
       setQuantity(1);
+      setDiscount(0);
+      setProofType("AADHAAR");
       setToast(
         `Sold ${soldProduct.productName} - ${currency.format(
-          soldProduct.price * soldQuantity
+          soldProduct.price * soldQuantity - saleDiscount
         )}`
       );
     } finally {
+      saleLockedRef.current = false;
       setIsSelling(false);
     }
   }
@@ -167,19 +194,19 @@ export function EmployeeBillingClient({
 
   return (
     <>
-      <div className="space-y-5">
-        <section className="rounded-[24px] border border-zinc-200 bg-white p-5">
-          <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="space-y-4 sm:space-y-5">
+        <section className="rounded-[24px] border border-zinc-200 bg-white p-4 sm:p-5">
+          <div className="grid gap-4 md:grid-cols-[1fr_360px] md:items-end">
             <div>
               <p className="text-sm font-medium text-zinc-500">
                 Billing workflow
               </p>
-              <h1 className="mt-1 text-xl font-medium">
+              <h1 className="mt-1 text-xl font-semibold sm:text-2xl">
                 Choose shop and sell products
               </h1>
             </div>
 
-            <div className="w-full max-w-sm">
+            <div className="w-full">
               <label
                 htmlFor="shop"
                 className="mb-2 block text-sm font-medium text-zinc-700"
@@ -219,7 +246,75 @@ export function EmployeeBillingClient({
             </div>
           </div>
 
-          <div className="scrollbar-hover overflow-x-auto">
+          <div className="divide-y divide-zinc-100 md:hidden">
+            {visibleProducts.length > 0 ? (
+              visibleProducts.map((product) => (
+                <button
+                  key={product.id}
+                  type="button"
+                  disabled={product.stock <= 0}
+                  className="flex w-full items-center gap-3 px-4 py-4 text-left transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-70"
+                  onClick={() => {
+                    handleOpenProductQr(product);
+                  }}
+                >
+                  {product.mainImageUrl ? (
+                    <div className="size-14 shrink-0 overflow-hidden rounded-2xl bg-zinc-100">
+                      <Image
+                        src={product.mainImageUrl}
+                        alt={product.productName}
+                        width={56}
+                        height={56}
+                        unoptimized
+                        className="size-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-zinc-950 text-sm font-semibold text-white">
+                      {product.productName.slice(0, 1).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-zinc-950">
+                          {product.productName}
+                        </p>
+                        <p className="mt-1 truncate text-xs text-zinc-500">
+                          {product.productCode}
+                        </p>
+                      </div>
+                      <span
+                        className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
+                          product.stock <= 0
+                            ? "bg-red-50 text-red-700"
+                            : product.stock <= 5
+                            ? "bg-amber-50 text-amber-700"
+                            : "bg-emerald-50 text-emerald-700"
+                        }`}
+                      >
+                        {product.stock}
+                      </span>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <p className="text-sm font-semibold text-zinc-950">
+                        {currency.format(product.price)}
+                      </p>
+                      <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700">
+                        {product.subcategoryName}
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              ))
+            ) : (
+              <div className="px-5 py-12 text-center text-sm text-zinc-500">
+                No products found for this shop.
+              </div>
+            )}
+          </div>
+
+          <div className="scrollbar-hover hidden overflow-x-auto md:block">
             <table className="w-full min-w-[900px] border-collapse text-left">
               <thead className="bg-zinc-50 text-xs font-semibold uppercase tracking-wide text-zinc-500">
                 <tr>
@@ -336,7 +431,7 @@ export function EmployeeBillingClient({
 
       {qrProduct ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-[28px] bg-white p-5 shadow-2xl">
+          <div className="max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-[28px] bg-white p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-medium text-zinc-500">
@@ -379,13 +474,42 @@ export function EmployeeBillingClient({
                 Scan from the header to sell this product.
               </p>
             </div>
+
+            <div className="mt-4 space-y-3">
+              {[
+                ["Shop", qrProduct.shopName],
+                ["Category", qrProduct.categoryName],
+                ["Brand", qrProduct.subcategoryName],
+                ["Selling Price", currency.format(qrProduct.price)],
+                ["Stock", `${qrProduct.stock} units`],
+              ].map(([label, value]) => (
+                <div
+                  key={label}
+                  className="flex items-center justify-between gap-4 rounded-2xl bg-zinc-50 px-4 py-3 text-sm"
+                >
+                  <span className="text-zinc-500">{label}</span>
+                  <span className="text-right font-semibold text-zinc-950">
+                    {value}
+                  </span>
+                </div>
+              ))}
+
+              {qrProduct.description ? (
+                <div className="rounded-2xl bg-zinc-50 px-4 py-3 text-sm">
+                  <p className="text-zinc-500">Description</p>
+                  <p className="mt-1 font-medium leading-6 text-zinc-950">
+                    {qrProduct.description}
+                  </p>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       ) : null}
 
       {saleProduct ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-[28px] bg-white p-5 shadow-2xl">
+          <div className="max-h-[calc(100vh-2rem)] w-full max-w-lg overflow-y-auto rounded-[28px] bg-white p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-medium text-zinc-500">
@@ -407,7 +531,7 @@ export function EmployeeBillingClient({
               </button>
             </div>
 
-            <div className="mt-5 space-y-3">
+            <form action={confirmSale} className="mt-5 space-y-4">
               {saleProduct.mainImageUrl ? (
                 <Image
                   src={saleProduct.mainImageUrl}
@@ -419,11 +543,17 @@ export function EmployeeBillingClient({
                 />
               ) : null}
               {[
-                ["Code", saleProduct.productCode],
-                ["Shop", saleProduct.shopName],
-                ["Price", currency.format(saleProduct.price)],
-                ["Available Stock", `${saleProduct.stock} units`],
-              ].map(([label, value]) => (
+                  ["Code", saleProduct.productCode],
+                  ["Shop", saleProduct.shopName],
+                  ["Price", currency.format(saleProduct.price)],
+                  ["Available Stock", `${saleProduct.stock} units`],
+                  [
+                    "Payable",
+                    currency.format(
+                      Math.max(saleProduct.price * quantity - discount, 0)
+                    ),
+                  ],
+                ].map(([label, value]) => (
                 <div
                   key={label}
                   className="flex items-center justify-between rounded-2xl bg-zinc-50 px-4 py-3 text-sm"
@@ -442,19 +572,112 @@ export function EmployeeBillingClient({
                 </label>
                 <input
                   id="quantity"
+                  name="quantity"
                   type="number"
                   min={1}
                   max={saleProduct.stock}
                   value={quantity}
                   onChange={(event) => {
-                    setQuantity(Number(event.target.value));
+                    setQuantity(Math.trunc(Number(event.target.value) || 0));
                   }}
                   className="w-full rounded-full border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-950"
                 />
               </div>
-            </div>
 
-            <div className="mt-6 grid grid-cols-2 gap-3">
+              <div>
+                <label
+                  htmlFor="discount"
+                  className="mb-2 block text-sm font-medium text-zinc-700"
+                >
+                  Discount optional
+                </label>
+                <input
+                  id="discount"
+                  name="discount"
+                  type="number"
+                  min={0}
+                  max={saleProduct.price * quantity}
+                  step="0.01"
+                  value={discount}
+                  onChange={(event) => {
+                    setDiscount(Math.max(0, Number(event.target.value) || 0));
+                  }}
+                  placeholder="0"
+                  className="w-full rounded-full border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-950"
+                />
+              </div>
+
+              <div>
+                <p className="mb-2 text-sm font-medium text-zinc-700">
+                  Proof type
+                </p>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {proofTypes.map(([value, label]) => (
+                    <label
+                      key={value}
+                      className={`flex cursor-pointer items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-center text-xs font-semibold ${
+                        proofType === value
+                          ? "border-zinc-950 bg-zinc-950 text-white"
+                          : "border-zinc-300 text-zinc-700"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="proofType"
+                        value={value}
+                        checked={proofType === value}
+                        onChange={() => {
+                          setProofType(value);
+                        }}
+                        className="sr-only"
+                      />
+                      <IdCard className="h-4 w-4" />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label
+                    htmlFor="proofFront"
+                    className="mb-2 block text-sm font-medium text-zinc-700"
+                  >
+                    Proof front
+                  </label>
+                  <input
+                    id="proofFront"
+                    name="proofFront"
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    required
+                    className="w-full rounded-2xl border border-zinc-300 px-4 py-3 text-sm file:mr-3 file:rounded-full file:border-0 file:bg-zinc-950 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="proofBack"
+                    className="mb-2 block text-sm font-medium text-zinc-700"
+                  >
+                    Proof back
+                  </label>
+                  <input
+                    id="proofBack"
+                    name="proofBack"
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    required
+                    className="w-full rounded-2xl border border-zinc-300 px-4 py-3 text-sm file:mr-3 file:rounded-full file:border-0 file:bg-zinc-950 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white"
+                  />
+                </div>
+              </div>
+
+              <input type="hidden" name="productId" value={saleProduct.id} />
+
+              <div className="grid grid-cols-2 gap-3 pt-2">
               <button
                 type="button"
                 className="inline-flex items-center justify-center gap-2 rounded-full border border-zinc-300 px-5 py-3 text-sm font-semibold text-zinc-700 hover:bg-zinc-100"
@@ -466,11 +689,15 @@ export function EmployeeBillingClient({
                 Cancel
               </button>
               <button
-                type="button"
-                disabled={isSelling || quantity < 1 || quantity > saleProduct.stock}
+                type="submit"
+                disabled={
+                  isSelling ||
+                  quantity < 1 ||
+                  quantity > saleProduct.stock ||
+                  discount > saleProduct.price * quantity
+                }
                 aria-busy={isSelling}
                 className="inline-flex items-center justify-center gap-2 rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
-                onClick={confirmSale}
               >
                 {isSelling ? (
                   <>
@@ -484,7 +711,8 @@ export function EmployeeBillingClient({
                   </>
                 )}
               </button>
-            </div>
+              </div>
+            </form>
           </div>
         </div>
       ) : null}

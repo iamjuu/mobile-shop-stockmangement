@@ -5,6 +5,9 @@ import { Download, Loader2, Pencil, Plus, Printer, Trash2, X } from "lucide-reac
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
+import { ActionButton } from "@/components/action-button";
+import { TablePagination } from "@/components/table-pagination";
+
 import { QRPreview } from "./QRPreview";
 
 interface ProductDirectoryItem {
@@ -57,6 +60,7 @@ const currency = new Intl.NumberFormat("en-IN", {
   currency: "INR",
   style: "currency",
 });
+const PAGE_SIZE = 7;
 
 function escapeHtml(value: string) {
   return value
@@ -85,6 +89,7 @@ export function ProductDirectory({
   const [duplicatingProductId, setDuplicatingProductId] = useState<string | null>(null);
   const [sourceFilter, setSourceFilter] =
     useState<"ALL" | "REGULAR" | "EXCHANGE_THIRD_PARTY">("REGULAR");
+  const [currentPage, setCurrentPage] = useState(1);
   const qrRef = useRef<HTMLDivElement>(null);
 
   const qrValue = useMemo(() => {
@@ -152,6 +157,16 @@ export function ProductDirectory({
       return Array.from(groupedProducts.values());
     },
     [localProducts, sourceFilter]
+  );
+  const totalPages = Math.max(1, Math.ceil(visibleProducts.length / PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedProducts = useMemo(
+    () =>
+      visibleProducts.slice(
+        (safeCurrentPage - 1) * PAGE_SIZE,
+        safeCurrentPage * PAGE_SIZE
+      ),
+    [safeCurrentPage, visibleProducts]
   );
 
   function getQrSvgMarkup() {
@@ -420,6 +435,7 @@ export function ProductDirectory({
                 key={value}
                 type="button"
                 onClick={() => {
+                  setCurrentPage(1);
                   setSourceFilter(
                     value as "ALL" | "REGULAR" | "EXCHANGE_THIRD_PARTY"
                   );
@@ -454,7 +470,7 @@ export function ProductDirectory({
 
             <tbody className="divide-y divide-zinc-100 text-sm">
               {visibleProducts.length > 0 ? (
-                visibleProducts.map((product) => (
+                paginatedProducts.map((product) => (
                   <tr
                     key={product.id}
                     className={`transition hover:bg-zinc-50 ${
@@ -621,6 +637,12 @@ export function ProductDirectory({
             </tbody>
           </table>
         </div>
+        <TablePagination
+          currentPage={safeCurrentPage}
+          pageSize={PAGE_SIZE}
+          totalItems={visibleProducts.length}
+          onPageChange={setCurrentPage}
+        />
       </section>
 
       {selectedProduct ? (
@@ -669,22 +691,22 @@ export function ProductDirectory({
                   Scan to read product details
                 </p>
                 <div className="mt-5 grid w-full grid-cols-2 gap-3">
-                  <button
-                    type="button"
+                  <ActionButton
+                    onAction={handleDownloadQr}
+                    loadingLabel="Downloading..."
                     className="inline-flex items-center justify-center gap-2 rounded-full bg-zinc-950 px-4 py-3 text-xs font-semibold text-white hover:bg-zinc-800"
-                    onClick={handleDownloadQr}
                   >
                     <Download className="h-4 w-4" />
                     Download
-                  </button>
-                  <button
-                    type="button"
+                  </ActionButton>
+                  <ActionButton
+                    onAction={handlePrintQr}
+                    loadingLabel="Preparing..."
                     className="inline-flex items-center justify-center gap-2 rounded-full border border-zinc-300 bg-white px-4 py-3 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
-                    onClick={handlePrintQr}
                   >
                     <Printer className="h-4 w-4" />
                     Print
-                  </button>
+                  </ActionButton>
                 </div>
               </div>
 

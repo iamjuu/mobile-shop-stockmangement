@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { CategoryService } from "@/features/categories/services/category.service";
+import { BrandDirectory } from "@/features/subcategories/components/BrandDirectory";
 import { SubCategoryService } from "@/features/subcategories/services/subcategory.service";
 
 export default async function SubcategoriesPage() {
@@ -34,6 +35,18 @@ export default async function SubcategoriesPage() {
 
     revalidatePath("/admin/subcategories");
   }
+
+  const directoryBrands = subcategories.map((subcategory) => ({
+    id: subcategory.id,
+    name: subcategory.name,
+    categoryName: subcategory.category.name,
+    shopName: subcategory.category.shop?.shopName ?? "All shops",
+    createdAt: subcategory.createdAt.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }),
+  }));
 
   return (
     <div className="space-y-5">
@@ -126,98 +139,7 @@ export default async function SubcategoriesPage() {
           </form>
         </section>
 
-        <section className="overflow-hidden rounded-[24px] border border-zinc-200 bg-white">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 px-5 py-4">
-            <div>
-              <h2 className="text-lg font-semibold">
-                Brand directory
-              </h2>
-              <p className="mt-1 text-sm text-zinc-500">
-                {subcategories.length} brands configured
-              </p>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] border-collapse text-left">
-              <thead className="bg-zinc-50 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                <tr>
-                  <th className="px-5 py-4">
-                    Name
-                  </th>
-                  <th className="px-5 py-4">
-                    Category
-                  </th>
-                  <th className="px-5 py-4">
-                    Shop
-                  </th>
-                  <th className="px-5 py-4">
-                    Created
-                  </th>
-                  <th className="px-5 py-4 text-right">
-                    Status
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-zinc-100 text-sm">
-                {subcategories.length > 0 ? (
-                  subcategories.map((subcategory) => (
-                    <tr
-                      key={subcategory.id}
-                      className="transition hover:bg-zinc-50"
-                    >
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 text-sm font-semibold text-zinc-700">
-                            {subcategory.name.slice(0, 1).toUpperCase()}
-                          </div>
-                          <div>
-                            <p className="font-medium text-zinc-950">
-                              {subcategory.name}
-                            </p>
-                            <p className="text-xs text-zinc-500">
-                              Product brand
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className="inline-flex rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700">
-                          {subcategory.category.name}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4 text-zinc-600">
-                        {subcategory.category.shop?.shopName ?? "All shops"}
-                      </td>
-                      <td className="px-5 py-4 text-zinc-600">
-                        {subcategory.createdAt.toLocaleDateString("en-IN", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        })}
-                      </td>
-                      <td className="px-5 py-4 text-right">
-                        <span className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                          Active
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td
-                      colSpan={5}
-                      className="px-5 py-12 text-center text-sm text-zinc-500"
-                    >
-                      No brands found. Add one under an existing category.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        <BrandDirectory brands={directoryBrands} />
       </div>
     </div>
   );

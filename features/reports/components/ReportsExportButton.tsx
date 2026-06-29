@@ -2,6 +2,8 @@
 
 import { Download } from "lucide-react";
 
+import { ActionButton } from "@/components/action-button";
+
 interface ReportSheet {
   name: string;
   rows: Record<string, string | number>[];
@@ -83,13 +85,13 @@ export function ReportsExportButton({
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleExport}
+    <ActionButton
+      onAction={handleExport}
+      loadingLabel="Exporting..."
       className="inline-flex items-center justify-center gap-2 rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800"
     >
       <Download className="h-4 w-4" />
       Export XLS
-    </button>
+    </ActionButton>
   );
 }

@@ -121,23 +121,23 @@ export function MobileScannerButton() {
           setError(null);
           setIsOpen(true);
         }}
-        className="flex items-center gap-2 rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800"
+        className="flex w-full items-center justify-center gap-2 rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800 sm:w-auto"
       >
         <ScanLine size={18} />
         Scan Product
       </button>
 
       {isOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-[28px] bg-white p-5 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-3 backdrop-blur-sm sm:items-center sm:p-4">
+          <div className="w-full max-w-md rounded-[28px] bg-white p-4 shadow-2xl sm:p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-medium text-zinc-500">
                   Product scanner
                 </p>
-                <h2 className="mt-1 text-2xl font-semibold">
-                  Scan product QR
-                </h2>
+              <h2 className="mt-1 text-xl font-semibold sm:text-2xl">
+                Scan product QR
+              </h2>
               </div>
               <button
                 type="button"
@@ -154,7 +154,7 @@ export function MobileScannerButton() {
                 ref={videoRef}
                 muted
                 playsInline
-                className="aspect-square w-full object-cover"
+                className="aspect-[4/5] w-full object-cover sm:aspect-square"
               />
             </div>
 
