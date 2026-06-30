@@ -180,7 +180,10 @@ export default async function ReportsPage({
       },
     }),
     prisma.product.findMany({
-      where: createdAtFilter,
+      where: {
+        ...createdAtFilter,
+        deletedAt: null,
+      },
       include: {
         shop: true,
         category: true,
@@ -221,7 +224,10 @@ export default async function ReportsPage({
       },
     }),
     prisma.product.aggregate({
-      where: createdAtFilter,
+      where: {
+        ...createdAtFilter,
+        deletedAt: null,
+      },
       _sum: {
         stock: true,
       },

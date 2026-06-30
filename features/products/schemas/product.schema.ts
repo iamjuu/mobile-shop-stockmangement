@@ -28,6 +28,9 @@ export const productSchema =
 
     galleryImageUrls:
       z.array(z.string()).optional(),
+
+    imeiNumber:
+      z.string().optional(),
   });
 
 export type ProductFormValues =

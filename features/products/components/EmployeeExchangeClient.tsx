@@ -57,14 +57,17 @@ export function EmployeeExchangeClient({
   products,
   action,
 }: EmployeeExchangeClientProps) {
+  const [dealType, setDealType] = useState<"EXCHANGE" | "MONEY">("EXCHANGE");
   const [shopId, setShopId] = useState(shops[0]?.id ?? "");
   const [soldProductId, setSoldProductId] = useState("");
   const [categoryMode, setCategoryMode] = useState<"existing" | "new">("existing");
   const [categoryId, setCategoryId] = useState("");
+  const [newCategoryName, setNewCategoryName] = useState("");
   const [subcategoryMode, setSubcategoryMode] =
     useState<"existing" | "new">("existing");
   const [subcategoryId, setSubcategoryId] = useState("");
   const [exchangeValue, setExchangeValue] = useState(0);
+  const [imeiNumber, setImeiNumber] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const submitLockedRef = useRef(false);
@@ -91,8 +94,18 @@ export function EmployeeExchangeClient({
       ? categoryId &&
         availableCategories.some((category) => category.id === categoryId)
         ? categoryId
-        : availableCategories[0]?.id ?? ""
+        : availableCategories.find(
+            (category) => category.name.toLowerCase() === "mobile"
+          )?.id ??
+          availableCategories[0]?.id ??
+          ""
       : "";
+  const activeCategoryName =
+    categoryMode === "existing"
+      ? availableCategories.find((category) => category.id === activeCategoryId)
+          ?.name ?? ""
+      : newCategoryName;
+  const isMobileCategory = activeCategoryName.trim().toLowerCase() === "mobile";
   const availableSubcategories = useMemo(
     () =>
       subcategories.filter(
@@ -114,12 +127,15 @@ export function EmployeeExchangeClient({
     (selectedSoldProduct?.price ?? 0) - exchangeValue
   );
   const isInvalidExchange =
-    !selectedSoldProduct ||
-    selectedSoldProduct.stock <= 0 ||
+    (dealType === "EXCHANGE" &&
+      (!selectedSoldProduct || selectedSoldProduct.stock <= 0)) ||
     exchangeValue < 0 ||
-    exchangeValue > selectedSoldProduct.price ||
+    (dealType === "EXCHANGE" &&
+      !!selectedSoldProduct &&
+      exchangeValue > selectedSoldProduct.price) ||
     (categoryMode === "existing" && !activeCategoryId) ||
-    (subcategoryMode === "existing" && !activeSubcategoryId);
+    (subcategoryMode === "existing" && !activeSubcategoryId) ||
+    (isMobileCategory && !imeiNumber.trim());
 
   async function handleSubmit(formData: FormData) {
     if (submitLockedRef.current) {
@@ -132,7 +148,10 @@ export function EmployeeExchangeClient({
 
     try {
       formData.set("shopId", shopId);
-      formData.set("soldProductId", activeSoldProductId);
+      formData.set("dealType", dealType);
+      if (dealType === "EXCHANGE") {
+        formData.set("soldProductId", activeSoldProductId);
+      }
       formData.set("categoryMode", categoryMode);
       formData.set("subcategoryMode", subcategoryMode);
 
@@ -149,6 +168,7 @@ export function EmployeeExchangeClient({
 
       if (result.success) {
         setExchangeValue(0);
+        setImeiNumber("");
       }
     } finally {
       submitLockedRef.current = false;
@@ -181,6 +201,30 @@ export function EmployeeExchangeClient({
             disabled={isSubmitting}
             className="space-y-5 disabled:pointer-events-none disabled:opacity-70"
           >
+          <div className="grid gap-2 rounded-full bg-zinc-100 p-1 sm:grid-cols-2">
+            {[
+              ["EXCHANGE", "Exchange user"],
+              ["MONEY", "Money user"],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                  dealType === value
+                    ? "bg-zinc-950 text-white shadow-sm"
+                    : "text-zinc-600 hover:bg-white"
+                }`}
+                onClick={() => {
+                  setDealType(value as "EXCHANGE" | "MONEY");
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {dealType === "EXCHANGE" ? (
+            <>
           <div>
             <h2 className="text-xl font-semibold">Product customer buys</h2>
             <p className="mt-1 text-sm text-zinc-500">
@@ -203,7 +247,9 @@ export function EmployeeExchangeClient({
                   setShopId(event.target.value);
                   setSoldProductId("");
                   setCategoryId("");
+                  setNewCategoryName("");
                   setSubcategoryId("");
+                  setImeiNumber("");
                 }}
                 className="w-full rounded-full border border-zinc-300 bg-white px-4 py-3 text-sm outline-none focus:border-zinc-950"
               >
@@ -284,6 +330,47 @@ export function EmployeeExchangeClient({
               No products found for this shop.
             </div>
           )}
+            </>
+          ) : null}
+
+          <div>
+            <h2 className="text-xl font-semibold">Customer</h2>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label
+                htmlFor="customerName"
+                className="mb-2 block text-sm font-medium text-zinc-700"
+              >
+                Customer name
+              </label>
+              <input
+                id="customerName"
+                name="customerName"
+                required
+                placeholder="Customer name"
+                className="w-full rounded-full border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-950"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="customerPhone"
+                className="mb-2 block text-sm font-medium text-zinc-700"
+              >
+                Customer phone
+              </label>
+              <input
+                id="customerPhone"
+                name="customerPhone"
+                type="tel"
+                required
+                placeholder="Customer phone"
+                className="w-full rounded-full border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-950"
+              />
+            </div>
+          </div>
 
           <div>
             <h2 className="text-xl font-semibold">Received phone</h2>
@@ -292,7 +379,7 @@ export function EmployeeExchangeClient({
             </p>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div>
             <div>
               <label
                 htmlFor="receivedProductName"
@@ -308,13 +395,15 @@ export function EmployeeExchangeClient({
                 className="w-full rounded-full border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-950"
               />
             </div>
+          </div>
 
+          <div className="grid gap-4 md:grid-cols-3">
             <div>
               <label
                 htmlFor="receivedImage"
                 className="mb-2 block text-sm font-medium text-zinc-700"
               >
-                Phone image
+                Device image 1
               </label>
               <input
                 id="receivedImage"
@@ -322,6 +411,39 @@ export function EmployeeExchangeClient({
                 type="file"
                 accept="image/*"
                 required
+                className="w-full rounded-3xl border border-dashed border-zinc-300 bg-white px-4 py-4 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-zinc-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="deviceImageOne"
+                className="mb-2 block text-sm font-medium text-zinc-700"
+              >
+                Device image 2
+              </label>
+              <input
+                id="deviceImageOne"
+                name="deviceImageOne"
+                type="file"
+                accept="image/*"
+                required
+                className="w-full rounded-3xl border border-dashed border-zinc-300 bg-white px-4 py-4 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-zinc-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="deviceImageTwo"
+                className="mb-2 block text-sm font-medium text-zinc-700"
+              >
+                Device image 3 optional
+              </label>
+              <input
+                id="deviceImageTwo"
+                name="deviceImageTwo"
+                type="file"
+                accept="image/*"
                 className="w-full rounded-3xl border border-dashed border-zinc-300 bg-white px-4 py-4 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-zinc-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
               />
             </div>
@@ -343,6 +465,9 @@ export function EmployeeExchangeClient({
                     setCategoryMode(
                       categoryMode === "existing" ? "new" : "existing"
                     );
+                    setNewCategoryName("");
+                    setSubcategoryId("");
+                    setImeiNumber("");
                   }}
                 >
                   {categoryMode === "existing" ? "Create new" : "Use existing"}
@@ -371,6 +496,10 @@ export function EmployeeExchangeClient({
               ) : (
                 <input
                   name="newCategoryName"
+                  value={newCategoryName}
+                  onChange={(event) => {
+                    setNewCategoryName(event.target.value);
+                  }}
                   required
                   placeholder="New category name"
                   className="w-full rounded-full border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-950"
@@ -436,7 +565,7 @@ export function EmployeeExchangeClient({
                 htmlFor="exchangeValue"
                 className="mb-2 block text-sm font-medium text-zinc-700"
               >
-                Exchange value
+                {dealType === "EXCHANGE" ? "Exchange value" : "Purchase amount"}
               </label>
               <input
                 id="exchangeValue"
@@ -487,6 +616,93 @@ export function EmployeeExchangeClient({
             </div>
           </div>
 
+          {isMobileCategory ? (
+            <div>
+              <div>
+                <label
+                  htmlFor="imeiNumber"
+                  className="mb-2 block text-sm font-medium text-zinc-700"
+                >
+                  IMEI number
+                </label>
+                <input
+                  id="imeiNumber"
+                  name="imeiNumber"
+                  value={imeiNumber}
+                  onChange={(event) => {
+                    setImeiNumber(event.target.value);
+                  }}
+                  required
+                  placeholder="Enter IMEI number"
+                  className="w-full rounded-full border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-950"
+                />
+              </div>
+            </div>
+          ) : null}
+
+          <div>
+            <p className="mb-2 text-sm font-medium text-zinc-700">
+              Proof type
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {[
+                ["AADHAAR", "Aadhaar"],
+                ["LICENSE", "License"],
+              ].map(([value, label]) => (
+                <label
+                  key={value}
+                  className="flex cursor-pointer items-center justify-center rounded-2xl border border-zinc-300 px-3 py-3 text-center text-xs font-semibold text-zinc-700 has-[:checked]:border-zinc-950 has-[:checked]:bg-zinc-950 has-[:checked]:text-white"
+                >
+                  <input
+                    type="radio"
+                    name="proofType"
+                    value={value}
+                    defaultChecked={value === "AADHAAR"}
+                    required
+                    className="sr-only"
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label
+                htmlFor="proofFront"
+                className="mb-2 block text-sm font-medium text-zinc-700"
+              >
+                Proof front
+              </label>
+              <input
+                id="proofFront"
+                name="proofFront"
+                type="file"
+                accept="image/*"
+                required
+                className="w-full rounded-3xl border border-dashed border-zinc-300 bg-white px-4 py-4 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-zinc-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="proofBack"
+                className="mb-2 block text-sm font-medium text-zinc-700"
+              >
+                Proof back
+              </label>
+              <input
+                id="proofBack"
+                name="proofBack"
+                type="file"
+                accept="image/*"
+                required
+                className="w-full rounded-3xl border border-dashed border-zinc-300 bg-white px-4 py-4 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-zinc-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+              />
+            </div>
+          </div>
+
           <div>
             <label
               htmlFor="paymentMethod"
@@ -523,13 +739,24 @@ export function EmployeeExchangeClient({
         </section>
 
         <aside className="h-fit rounded-[24px] border border-zinc-200 bg-white p-5">
-          <h2 className="text-xl font-semibold">Exchange summary</h2>
+          <h2 className="text-xl font-semibold">
+            {dealType === "EXCHANGE" ? "Exchange summary" : "Money summary"}
+          </h2>
           <div className="mt-5 space-y-3">
-            {[
-              ["Product price", currency.format(selectedSoldProduct?.price ?? 0)],
-              ["Exchange value", currency.format(exchangeValue || 0)],
-              ["Cash balance", currency.format(cashBalance)],
-            ].map(([label, value]) => (
+            {(dealType === "EXCHANGE"
+              ? [
+                  [
+                    "Product price",
+                    currency.format(selectedSoldProduct?.price ?? 0),
+                  ],
+                  ["Exchange value", currency.format(exchangeValue || 0)],
+                  ["Cash balance", currency.format(cashBalance)],
+                ]
+              : [
+                  ["Amount paid", currency.format(exchangeValue || 0)],
+                  ["Resale price", "Enter in form"],
+                ]
+            ).map(([label, value]) => (
               <div
                 key={label}
                 className="flex items-center justify-between rounded-2xl bg-zinc-50 px-4 py-3 text-sm"

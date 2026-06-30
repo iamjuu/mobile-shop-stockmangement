@@ -5,6 +5,7 @@ import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { CategoryService } from "@/features/categories/services/category.service";
 import { BrandDirectory } from "@/features/subcategories/components/BrandDirectory";
 import { SubCategoryService } from "@/features/subcategories/services/subcategory.service";
+import { prisma } from "@/lib/prisma";
 
 export default async function SubcategoriesPage() {
   const categoryService = new CategoryService();
@@ -36,9 +37,104 @@ export default async function SubcategoriesPage() {
     revalidatePath("/admin/subcategories");
   }
 
+  async function updateSubcategory(
+    brandId: string,
+    data: {
+      name: string;
+      categoryId: string;
+    }
+  ) {
+    "use server";
+
+    const name = data.name.trim();
+
+    if (!brandId || name.length < 2 || !data.categoryId) {
+      return {
+        ok: false,
+        message: "Invalid brand details.",
+      };
+    }
+
+    const category = await prisma.category.findUnique({
+      where: {
+        id: data.categoryId,
+      },
+    });
+
+    if (!category) {
+      return {
+        ok: false,
+        message: "Category not found.",
+      };
+    }
+
+    await prisma.subCategory.update({
+      where: {
+        id: brandId,
+      },
+      data: {
+        name,
+        categoryId: data.categoryId,
+      },
+    });
+
+    revalidatePath("/admin/subcategories");
+    revalidatePath("/admin/products");
+    revalidatePath("/admin/product-catalog");
+    revalidatePath("/employee/product-catalog");
+    revalidatePath("/employee/exchange");
+
+    return {
+      ok: true,
+      message: "Brand updated successfully.",
+    };
+  }
+
+  async function deleteSubcategory(brandId: string) {
+    "use server";
+
+    if (!brandId) {
+      return {
+        ok: false,
+        message: "Invalid brand.",
+      };
+    }
+
+    const productCount = await prisma.product.count({
+      where: {
+        subcategoryId: brandId,
+      },
+    });
+
+    if (productCount > 0) {
+      return {
+        ok: false,
+        message: "Brand is used by products and cannot be deleted.",
+      };
+    }
+
+    await prisma.subCategory.delete({
+      where: {
+        id: brandId,
+      },
+    });
+
+    revalidatePath("/admin/subcategories");
+    revalidatePath("/admin/products");
+    revalidatePath("/admin/product-catalog");
+    revalidatePath("/employee/product-catalog");
+    revalidatePath("/employee/exchange");
+
+    return {
+      ok: true,
+      message: "Brand deleted successfully.",
+    };
+  }
+
   const directoryBrands = subcategories.map((subcategory) => ({
     id: subcategory.id,
     name: subcategory.name,
+    categoryId: subcategory.categoryId,
     categoryName: subcategory.category.name,
     shopName: subcategory.category.shop?.shopName ?? "All shops",
     createdAt: subcategory.createdAt.toLocaleDateString("en-IN", {
@@ -139,7 +235,16 @@ export default async function SubcategoriesPage() {
           </form>
         </section>
 
-        <BrandDirectory brands={directoryBrands} />
+        <BrandDirectory
+          brands={directoryBrands}
+          categories={categories.map((category) => ({
+            id: category.id,
+            name: category.name,
+            shopName: category.shop?.shopName ?? "All shops",
+          }))}
+          updateAction={updateSubcategory}
+          deleteAction={deleteSubcategory}
+        />
       </div>
     </div>
   );

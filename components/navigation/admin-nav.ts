@@ -47,6 +47,11 @@ export const adminNavItems = [
     icon: RefreshCcw,
   },
   {
+    title: "Users",
+    href: "/admin/users",
+    icon: Users,
+  },
+  {
     title: "Employees",
     href: "/admin/employees",
     icon: Users,

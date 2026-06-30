@@ -44,7 +44,11 @@ export default async function EmployeeDashboard() {
       },
       take: 5,
     }),
-    prisma.product.count(),
+    prisma.product.count({
+      where: {
+        deletedAt: null,
+      },
+    }),
     prisma.shop.count(),
   ]);
 

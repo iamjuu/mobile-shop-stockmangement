@@ -12,6 +12,9 @@ type ProductCreateData =
 export class ProductRepository {
   async findAll() {
     return prisma.product.findMany({
+      where: {
+        deletedAt: null,
+      },
       include: {
         shop: true,
         category: {
@@ -30,9 +33,10 @@ export class ProductRepository {
   async findByCode(
     productCode: string
   ) {
-    return prisma.product.findUnique({
+    return prisma.product.findFirst({
       where: {
         productCode,
+        deletedAt: null,
       },
     });
   }

@@ -48,28 +48,39 @@ export default async function AdminExchangesPage() {
           receivedProductName: exchange.receivedProductName,
           receivedProductCode: exchange.receivedProductCode,
           receivedProductImageUrl:
-            exchange.receivedProduct.mainImageUrl ??
-            exchange.receivedProduct.imageUrl,
-          receivedCategoryName: exchange.receivedProduct.category.name,
-          receivedSubcategoryName: exchange.receivedProduct.subcategory.name,
+            exchange.receivedProduct?.mainImageUrl ??
+            exchange.receivedProduct?.imageUrl ??
+            "",
+          receivedCategoryName:
+            exchange.receivedProduct?.category?.name ?? "Deleted Category",
+          receivedSubcategoryName:
+            exchange.receivedProduct?.subcategory?.name ?? "Deleted Brand",
           receivedProductPrice: exchange.receivedProductPrice,
-          receivedProductStock: exchange.receivedProduct.stock,
+          receivedProductStock: exchange.receivedProduct?.stock ?? 0,
+
           soldProductName: exchange.soldProductName,
           soldProductCode: exchange.soldProductCode,
-          soldCategoryName: exchange.soldProduct.category.name,
-          soldSubcategoryName: exchange.soldProduct.subcategory.name,
+          soldCategoryName:
+            exchange.soldProduct?.category?.name ?? "Deleted Category",
+          soldSubcategoryName:
+            exchange.soldProduct?.subcategory?.name ?? "Deleted Brand",
           soldProductPrice: exchange.soldProductPrice,
+
           exchangeValue: exchange.exchangeValue,
           cashBalance: exchange.cashBalance,
           paymentMethod: exchange.paymentMethod ?? "CASH",
+
           employeeName: exchange.employee.name,
           employeeEmail: exchange.employee.email,
+
           shopName: exchange.shop.shopName,
           shopCode: exchange.shop.shopCode,
           shopPhone: exchange.shop.phone || "Not added",
           shopAddress: exchange.shop.address || "Not added",
+
           condition: exchange.condition || "Not added",
           notes: exchange.notes || "Not added",
+
           createdAt: exchange.createdAt.toLocaleString("en-IN", {
             day: "2-digit",
             month: "short",

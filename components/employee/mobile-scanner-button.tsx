@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ScanLine, X } from "lucide-react";
 import type { IScannerControls } from "@zxing/browser";
+import { usePathname, useRouter } from "next/navigation";
 
 function dispatchProductScan(value: string) {
   window.dispatchEvent(
@@ -13,6 +14,8 @@ function dispatchProductScan(value: string) {
 }
 
 export function MobileScannerButton() {
+  const pathname = usePathname();
+  const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
   const scannedRef = useRef(false);
@@ -39,10 +42,14 @@ export function MobileScannerButton() {
       }
 
       scannedRef.current = true;
-      dispatchProductScan(value);
+      if (pathname === "/employee/billing") {
+        dispatchProductScan(value);
+      } else {
+        router.push(`/employee/billing?scan=${encodeURIComponent(value.trim())}`);
+      }
       closeScanner();
     },
-    [closeScanner]
+    [closeScanner, pathname, router]
   );
 
   useEffect(() => {

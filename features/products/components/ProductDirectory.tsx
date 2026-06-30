@@ -646,8 +646,8 @@ export function ProductDirectory({
       </section>
 
       {selectedProduct ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-3xl overflow-hidden rounded-[28px] bg-white shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-[10px] backdrop-blur-xs sm:p-4">
+          <div className="scrollbar-hidden max-h-[calc(100dvh-20px)] w-full max-w-3xl overflow-y-auto rounded-[28px] bg-white shadow-2xl sm:max-h-[calc(100vh-2rem)]">
             <div className="flex items-start justify-between gap-4 border-b border-zinc-200 p-5">
               <div>
                 <p className="text-sm font-medium text-zinc-500">

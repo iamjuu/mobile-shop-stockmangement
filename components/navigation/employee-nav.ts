@@ -3,6 +3,8 @@ import {
   Receipt,
   History,
   RefreshCcw,
+  Users,
+  PackageSearch,
 } from "lucide-react";
 
 export const employeeNavItems = [
@@ -17,6 +19,11 @@ export const employeeNavItems = [
     icon: Receipt,
   },
   {
+    title: "Product",
+    href: "/employee/product-catalog",
+    icon: PackageSearch,
+  },
+  {
     title: "Exchange",
     href: "/employee/exchange",
     icon: RefreshCcw,
@@ -25,6 +32,11 @@ export const employeeNavItems = [
     title: "Exchange History",
     href: "/employee/exchange-history",
     icon: RefreshCcw,
+  },
+  {
+    title: "Users",
+    href: "/employee/users",
+    icon: Users,
   },
   {
     title: "Sales History",

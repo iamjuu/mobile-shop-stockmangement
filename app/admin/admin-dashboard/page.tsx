@@ -36,7 +36,11 @@ export default async function DashboardPage() {
     totalProfitResult,
   ] = await Promise.all([
     prisma.shop.count(),
-    prisma.product.count(),
+    prisma.product.count({
+      where: {
+        deletedAt: null,
+      },
+    }),
     prisma.user.count({
       where: {
         role: "EMPLOYEE",
@@ -45,12 +49,16 @@ export default async function DashboardPage() {
     prisma.category.count(),
     prisma.exchange.count(),
     prisma.product.aggregate({
+      where: {
+        deletedAt: null,
+      },
       _sum: {
         stock: true,
       },
     }),
     prisma.product.findMany({
       where: {
+        deletedAt: null,
         stock: {
           lte: 5,
         },
@@ -70,6 +78,9 @@ export default async function DashboardPage() {
       take: 6,
     }),
     prisma.product.findMany({
+      where: {
+        deletedAt: null,
+      },
       include: {
         shop: true,
       },

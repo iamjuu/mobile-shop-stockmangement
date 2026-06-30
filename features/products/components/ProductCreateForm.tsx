@@ -53,6 +53,11 @@ export function ProductCreateForm({
     categoryId && availableCategories.some((category) => category.id === categoryId)
       ? categoryId
       : availableCategories[0]?.id ?? "";
+  const selectedCategory = availableCategories.find(
+    (category) => category.id === selectedCategoryId
+  );
+  const isMobileCategory =
+    selectedCategory?.name.trim().toLowerCase() === "mobile";
 
   const availableSubcategories = useMemo(
     () =>
@@ -217,6 +222,24 @@ export function ProductCreateForm({
           ))}
         </select>
       </div>
+
+      {isMobileCategory ? (
+        <div>
+          <label
+            htmlFor="imeiNumber"
+            className="mb-2 block text-sm font-medium text-zinc-700"
+          >
+            IMEI number
+          </label>
+          <input
+            id="imeiNumber"
+            name="imeiNumber"
+            required
+            placeholder="Enter IMEI number"
+            className="w-full rounded-full border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-950"
+          />
+        </div>
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div>

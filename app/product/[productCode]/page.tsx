@@ -11,9 +11,10 @@ export default async function ProductPage({
     await params;
 
   const product =
-    await prisma.product.findUnique({
+    await prisma.product.findFirst({
       where: {
         productCode,
+        deletedAt: null,
       },
       include: {
         shop: true,

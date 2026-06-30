@@ -2,11 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { Loader2 } from "lucide-react";
 
 import { employeeNavItems } from "@/components/navigation/employee-nav";
 
 export function EmployeeSidebar() {
   const pathname = usePathname();
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
 
   return (
     <header className="sticky top-0 z-30 border-b border-zinc-200 bg-[#f4f2eb]/95 px-3 py-2 backdrop-blur sm:p-[10px]">
@@ -22,18 +25,30 @@ export function EmployeeSidebar() {
           {employeeNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
+            const isPending = pendingHref === item.href && pendingHref !== pathname;
 
             return (
               <Link
                 key={item.href}
                 href={item.href}
+                aria-current={isActive ? "page" : undefined}
+                aria-disabled={isPending}
+                onClick={() => {
+                  if (!isActive) {
+                    setPendingHref(item.href);
+                  }
+                }}
                 className={`flex shrink-0 items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition sm:px-4 ${
-                  isActive
+                  isActive || isPending
                     ? "bg-zinc-950 text-white shadow-sm"
                     : "text-zinc-700 hover:bg-white hover:text-zinc-950"
                 }`}
               >
-                <Icon size={16} />
+                {isPending ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Icon size={16} />
+                )}
                 <span className="whitespace-nowrap">{item.title}</span>
               </Link>
             );

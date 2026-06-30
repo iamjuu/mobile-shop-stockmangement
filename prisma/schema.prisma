@@ -22,6 +22,11 @@ enum PaymentMethod {
   UPI
 }
 
+enum CustomerType {
+  MONEY
+  EXCHANGE
+}
+
 model User {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
@@ -100,6 +105,7 @@ model Product {
   imageUrl    String?
   mainImageUrl String?
   galleryImageUrls String[] @default([])
+  imeiNumber String?
   description String?
   qrCode      String?
   barcode     String?
@@ -113,6 +119,7 @@ model Product {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  deletedAt DateTime?
 }
 
 model Exchange {
@@ -133,6 +140,12 @@ model Exchange {
   exchangeValue       Float
   cashBalance         Float
   paymentMethod       PaymentMethod? @default(CASH)
+  receivedProductImeiNumber String?
+  proofType           String?
+  proofFrontImageUrl  String?
+  proofBackImageUrl   String?
+  proofFrontPublicId  String?
+  proofBackPublicId   String?
   condition           String?
   notes               String?
 
@@ -147,6 +160,39 @@ model Exchange {
   @@index([shopId])
   @@index([soldProductId])
   @@index([receivedProductId])
+}
+
+model Customer {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  customerName String
+  phone        String
+  type         CustomerType
+
+  employeeId    String @db.ObjectId
+  employeeName  String
+  employeeEmail String
+  shopId        String @db.ObjectId
+  shopName      String
+
+  receivedProductId   String @db.ObjectId
+  receivedProductCode String
+  receivedProductName String
+  exchangeId          String? @db.ObjectId
+
+  amount      Float
+  resalePrice Float
+  imeiNumber  String?
+  proofType   String?
+  proofFrontImageUrl String?
+  proofBackImageUrl  String?
+
+  createdAt DateTime @default(now())
+
+  @@index([employeeId])
+  @@index([shopId])
+  @@index([type])
+  @@index([phone])
 }
 
 model Sale {

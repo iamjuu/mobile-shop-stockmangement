@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, IdCard, Loader2, QrCode, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Check, Loader2, QrCode, X } from "lucide-react";
 import Image from "next/image";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { QRPreview } from "./QRPreview";
 
@@ -35,12 +36,6 @@ const currency = new Intl.NumberFormat("en-IN", {
   currency: "INR",
   style: "currency",
 });
-const proofTypes = [
-  ["AADHAAR", "Aadhaar"],
-  ["DRIVING_LICENCE", "Driving Licence"],
-  ["VOTER_ID", "Voter ID"],
-] as const;
-
 function getProductCodeFromScan(value: string) {
   try {
     const parsed = JSON.parse(value) as {
@@ -71,14 +66,13 @@ export function EmployeeBillingClient({
   products,
   saleAction,
 }: EmployeeBillingClientProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [selectedShopId, setSelectedShopId] = useState(shops[0]?.id ?? "");
   const [qrProduct, setQrProduct] = useState<BillingProduct | null>(null);
   const [saleProduct, setSaleProduct] = useState<BillingProduct | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [discount, setDiscount] = useState(0);
-  const [proofType, setProofType] = useState<(typeof proofTypes)[number][0]>(
-    "AADHAAR"
-  );
   const [isSelling, setIsSelling] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const saleLockedRef = useRef(false);
@@ -88,31 +82,36 @@ export function EmployeeBillingClient({
     [products, selectedShopId]
   );
 
-  useEffect(() => {
-    function handleScan(event: Event) {
-      const scannedValue = (event as CustomEvent<string>).detail;
-      const productCode = getProductCodeFromScan(scannedValue);
-      const product = products.find(
+  const openSaleFromScan = useCallback((scannedValue: string) => {
+    const productCode = getProductCodeFromScan(scannedValue).trim();
+    const product =
+      products.find(
         (item) =>
           item.productCode === productCode &&
           (!selectedShopId || item.shopId === selectedShopId)
-      );
+      ) ??
+      products.find((item) => item.productCode === productCode);
 
-      if (!product) {
-        setToast("Product not found for the selected shop.");
-        return;
-      }
+    if (!product) {
+      setToast("Product not found.");
+      return;
+    }
 
-      if (product.stock <= 0) {
-        setToast("Out of stock.");
-        return;
-      }
+    if (product.stock <= 0) {
+      setToast("Out of stock.");
+      return;
+    }
 
-      setQrProduct(null);
-      setSaleProduct(product);
-      setQuantity(1);
-      setDiscount(0);
-      setProofType("AADHAAR");
+    setSelectedShopId(product.shopId);
+    setQrProduct(null);
+    setSaleProduct(product);
+    setQuantity(1);
+    setDiscount(0);
+  }, [products, selectedShopId]);
+
+  useEffect(() => {
+    function handleScan(event: Event) {
+      openSaleFromScan((event as CustomEvent<string>).detail);
     }
 
     window.addEventListener("employee-product-scan", handleScan);
@@ -120,7 +119,24 @@ export function EmployeeBillingClient({
     return () => {
       window.removeEventListener("employee-product-scan", handleScan);
     };
-  }, [products, selectedShopId]);
+  }, [openSaleFromScan]);
+
+  useEffect(() => {
+    const scannedValue = searchParams.get("scan");
+
+    if (!scannedValue) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      openSaleFromScan(scannedValue);
+    }, 0);
+    router.replace("/employee/billing", { scroll: false });
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [openSaleFromScan, router, searchParams]);
 
   function handleOpenProductQr(product: BillingProduct) {
     if (product.stock <= 0) {
@@ -159,14 +175,13 @@ export function EmployeeBillingClient({
       const result = await saleAction(formData);
 
       if (!result.success) {
-        setToast("Sale could not be completed. Check stock, proof images, and discount.");
+        setToast("Sale could not be completed. Check stock and discount.");
         return;
       }
 
       setSaleProduct(null);
       setQuantity(1);
       setDiscount(0);
-      setProofType("AADHAAR");
       setToast(
         `Sold ${soldProduct.productName} - ${currency.format(
           soldProduct.price * soldQuantity - saleDiscount
@@ -430,8 +445,8 @@ export function EmployeeBillingClient({
       </div>
 
       {qrProduct ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-[28px] bg-white p-5 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-[10px] backdrop-blur-sm sm:p-4">
+          <div className="scrollbar-hidden max-h-[calc(100dvh-20px)] w-full max-w-md overflow-y-auto rounded-[28px] bg-white p-5 shadow-2xl sm:max-h-[calc(100vh-2rem)]">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-medium text-zinc-500">
@@ -608,71 +623,21 @@ export function EmployeeBillingClient({
               </div>
 
               <div>
-                <p className="mb-2 text-sm font-medium text-zinc-700">
-                  Proof type
-                </p>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  {proofTypes.map(([value, label]) => (
-                    <label
-                      key={value}
-                      className={`flex cursor-pointer items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-center text-xs font-semibold ${
-                        proofType === value
-                          ? "border-zinc-950 bg-zinc-950 text-white"
-                          : "border-zinc-300 text-zinc-700"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="proofType"
-                        value={value}
-                        checked={proofType === value}
-                        onChange={() => {
-                          setProofType(value);
-                        }}
-                        className="sr-only"
-                      />
-                      <IdCard className="h-4 w-4" />
-                      {label}
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label
-                    htmlFor="proofFront"
-                    className="mb-2 block text-sm font-medium text-zinc-700"
-                  >
-                    Proof front
-                  </label>
-                  <input
-                    id="proofFront"
-                    name="proofFront"
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    required
-                    className="w-full rounded-2xl border border-zinc-300 px-4 py-3 text-sm file:mr-3 file:rounded-full file:border-0 file:bg-zinc-950 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white"
-                  />
-                </div>
-                <div>
-                  <label
-                    htmlFor="proofBack"
-                    className="mb-2 block text-sm font-medium text-zinc-700"
-                  >
-                    Proof back
-                  </label>
-                  <input
-                    id="proofBack"
-                    name="proofBack"
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    required
-                    className="w-full rounded-2xl border border-zinc-300 px-4 py-3 text-sm file:mr-3 file:rounded-full file:border-0 file:bg-zinc-950 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white"
-                  />
-                </div>
+                <label
+                  htmlFor="proofNumber"
+                  className="mb-2 block text-sm font-medium text-zinc-700"
+                >
+                  Proof number optional
+                </label>
+                <input
+                  id="proofNumber"
+                  name="proofNumber"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  placeholder="Enter proof number"
+                  className="w-full rounded-full border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-950"
+                />
               </div>
 
               <input type="hidden" name="productId" value={saleProduct.id} />

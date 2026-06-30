@@ -55,6 +55,7 @@ export default async function ProductsPage() {
       price: formData.get("price"),
       stock: formData.get("stock"),
       description: String(formData.get("description") ?? "").trim() || undefined,
+      imeiNumber: String(formData.get("imeiNumber") ?? "").trim() || undefined,
     });
 
     if (!parsed.success) {
@@ -111,6 +112,10 @@ export default async function ProductsPage() {
       return;
     }
 
+    if (category.name.trim().toLowerCase() === "mobile" && !parsed.data.imeiNumber) {
+      return;
+    }
+
     const service = new ProductService();
     const uploadedImages: Array<{
       secureUrl: string;
@@ -143,6 +148,7 @@ export default async function ProductsPage() {
         imageUrl: mainImageUrl,
         mainImageUrl,
         galleryImageUrls,
+        imeiNumber: parsed.data.imeiNumber,
       });
     } catch {
       await deleteCloudinaryAssets(
@@ -216,15 +222,52 @@ export default async function ProductsPage() {
       };
     }
 
-    await prisma.product.delete({
-      where: {
-        id: productId,
-      },
-    });
+    const [
+      saleCount,
+      exchangeCount,
+    ] = await Promise.all([
+      prisma.sale.count({
+        where: {
+          productId,
+        },
+      }),
+      prisma.exchange.count({
+        where: {
+          OR: [
+            {
+              soldProductId: productId,
+            },
+            {
+              receivedProductId: productId,
+            },
+          ],
+        },
+      }),
+    ]);
+
+    if (saleCount > 0 || exchangeCount > 0) {
+      await prisma.product.update({
+        where: {
+          id: productId,
+        },
+        data: {
+          deletedAt: new Date(),
+          stock: 0,
+        },
+      });
+    } else {
+      await prisma.product.delete({
+        where: {
+          id: productId,
+        },
+      });
+    }
 
     revalidatePath("/admin/products");
+    revalidatePath("/admin/product-catalog");
     revalidatePath("/admin/admin-dashboard");
     revalidatePath("/employee/billing");
+    revalidatePath("/employee/product-catalog");
 
     return {
       ok: true,
@@ -274,6 +317,7 @@ export default async function ProductsPage() {
         imageUrl: product.imageUrl,
         mainImageUrl: product.mainImageUrl,
         galleryImageUrls: product.galleryImageUrls,
+        imeiNumber: product.imeiNumber,
         description: product.description,
         qrCode: product.qrCode,
         barcode: product.barcode,
