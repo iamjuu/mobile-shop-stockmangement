@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { CategoryService } from "@/features/categories/services/category.service";
+import { BrandCategoryPicker } from "@/features/subcategories/components/BrandCategoryPicker";
 import { BrandDirectory } from "@/features/subcategories/components/BrandDirectory";
 import { SubCategoryService } from "@/features/subcategories/services/subcategory.service";
 import { prisma } from "@/lib/prisma";
@@ -22,61 +23,132 @@ export default async function SubcategoriesPage() {
     "use server";
 
     const name = String(formData.get("name") ?? "").trim();
-    const categoryId = String(formData.get("categoryId") ?? "");
+    const categoryScope = String(formData.get("categoryScope") ?? "");
+    const selectedCategoryIds = formData
+      .getAll("categoryIds")
+      .map((value) => String(value));
 
-    if (!name || !categoryId) {
+    if (!name) {
       return;
     }
 
     const service = new SubCategoryService();
-    await service.create(
-      name,
-      categoryId
+    const categoryIds =
+      categoryScope === "all"
+        ? (
+            await prisma.category.findMany({
+              select: {
+                id: true,
+              },
+            })
+          ).map((category) => category.id)
+        : selectedCategoryIds;
+
+    if (categoryIds.length === 0) {
+      return;
+    }
+
+    await Promise.all(
+      categoryIds.map((categoryId) => service.create(name, categoryId))
     );
 
     revalidatePath("/admin/subcategories");
   }
 
   async function updateSubcategory(
-    brandId: string,
+    subcategoryIds: string[],
     data: {
       name: string;
-      categoryId: string;
+      categoryIds: string[];
     }
   ) {
     "use server";
 
     const name = data.name.trim();
+    const categoryIds = [...new Set(data.categoryIds)];
 
-    if (!brandId || name.length < 2 || !data.categoryId) {
+    if (
+      subcategoryIds.length === 0 ||
+      name.length < 2 ||
+      categoryIds.length === 0
+    ) {
       return {
         ok: false,
         message: "Invalid brand details.",
       };
     }
 
-    const category = await prisma.category.findUnique({
+    const currentRecords = await prisma.subCategory.findMany({
       where: {
-        id: data.categoryId,
+        id: {
+          in: subcategoryIds,
+        },
       },
     });
 
-    if (!category) {
+    if (currentRecords.length === 0) {
       return {
         ok: false,
-        message: "Category not found.",
+        message: "Brand not found.",
       };
     }
 
-    await prisma.subCategory.update({
-      where: {
-        id: brandId,
-      },
-      data: {
-        name,
-        categoryId: data.categoryId,
-      },
-    });
+    const currentCategoryIds = currentRecords.map(
+      (record) => record.categoryId
+    );
+    const categoriesToAdd = categoryIds.filter(
+      (categoryId) => !currentCategoryIds.includes(categoryId)
+    );
+    const categoriesToRemove = currentCategoryIds.filter(
+      (categoryId) => !categoryIds.includes(categoryId)
+    );
+    const recordsToRemove = currentRecords.filter((record) =>
+      categoriesToRemove.includes(record.categoryId)
+    );
+
+    for (const record of recordsToRemove) {
+      const productCount = await prisma.product.count({
+        where: {
+          subcategoryId: record.id,
+        },
+      });
+
+      if (productCount > 0) {
+        return {
+          ok: false,
+          message:
+            "Brand is used by products in a removed category and cannot be updated.",
+        };
+      }
+    }
+
+    const service = new SubCategoryService();
+    const recordsToKeep = currentRecords.filter((record) =>
+      categoryIds.includes(record.categoryId)
+    );
+
+    await Promise.all([
+      ...recordsToKeep.map((record) =>
+        prisma.subCategory.update({
+          where: {
+            id: record.id,
+          },
+          data: {
+            name,
+          },
+        })
+      ),
+      ...categoriesToAdd.map((categoryId) =>
+        service.create(name, categoryId)
+      ),
+      ...recordsToRemove.map((record) =>
+        prisma.subCategory.delete({
+          where: {
+            id: record.id,
+          },
+        })
+      ),
+    ]);
 
     revalidatePath("/admin/subcategories");
     revalidatePath("/admin/products");
@@ -90,32 +162,36 @@ export default async function SubcategoriesPage() {
     };
   }
 
-  async function deleteSubcategory(brandId: string) {
+  async function deleteSubcategory(subcategoryIds: string[]) {
     "use server";
 
-    if (!brandId) {
+    if (subcategoryIds.length === 0) {
       return {
         ok: false,
         message: "Invalid brand.",
       };
     }
 
-    const productCount = await prisma.product.count({
-      where: {
-        subcategoryId: brandId,
-      },
-    });
+    for (const subcategoryId of subcategoryIds) {
+      const productCount = await prisma.product.count({
+        where: {
+          subcategoryId,
+        },
+      });
 
-    if (productCount > 0) {
-      return {
-        ok: false,
-        message: "Brand is used by products and cannot be deleted.",
-      };
+      if (productCount > 0) {
+        return {
+          ok: false,
+          message: "Brand is used by products and cannot be deleted.",
+        };
+      }
     }
 
-    await prisma.subCategory.delete({
+    await prisma.subCategory.deleteMany({
       where: {
-        id: brandId,
+        id: {
+          in: subcategoryIds,
+        },
       },
     });
 
@@ -131,18 +207,75 @@ export default async function SubcategoriesPage() {
     };
   }
 
-  const directoryBrands = subcategories.map((subcategory) => ({
-    id: subcategory.id,
-    name: subcategory.name,
-    categoryId: subcategory.categoryId,
-    categoryName: subcategory.category.name,
-    shopName: subcategory.category.shop?.shopName ?? "All shops",
-    createdAt: subcategory.createdAt.toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    }),
-  }));
+  const totalCategoryCount = categories.length;
+  const groupedBrands = new Map<
+    string,
+    {
+      ids: string[];
+      name: string;
+      categories: {
+        id: string;
+        name: string;
+        shopName: string;
+      }[];
+      createdAt: Date;
+    }
+  >();
+
+  for (const subcategory of subcategories) {
+    const groupKey = subcategory.name.trim().toLowerCase();
+    const category = {
+      id: subcategory.categoryId,
+      name: subcategory.category.name,
+      shopName: subcategory.category.shop?.shopName ?? "All shops",
+    };
+    const existingGroup = groupedBrands.get(groupKey);
+
+    if (existingGroup) {
+      existingGroup.ids.push(subcategory.id);
+      existingGroup.categories.push(category);
+
+      if (subcategory.createdAt < existingGroup.createdAt) {
+        existingGroup.createdAt = subcategory.createdAt;
+      }
+    } else {
+      groupedBrands.set(groupKey, {
+        ids: [subcategory.id],
+        name: subcategory.name,
+        categories: [category],
+        createdAt: subcategory.createdAt,
+      });
+    }
+  }
+
+  const directoryBrands = Array.from(groupedBrands.values())
+    .map((group) => {
+    const uniqueCategories = Array.from(
+      new Map(group.categories.map((category) => [category.id, category])).values()
+    );
+    const uniqueShops = [
+      ...new Set(uniqueCategories.map((category) => category.shopName)),
+    ];
+
+    return {
+      ids: group.ids,
+      name: group.name,
+      categories: uniqueCategories,
+      isAllCategories:
+        totalCategoryCount > 0 &&
+        uniqueCategories.length === totalCategoryCount,
+      shopName:
+        uniqueShops.length === 1
+          ? uniqueShops[0]
+          : `${uniqueShops[0]} +${uniqueShops.length - 1}`,
+      createdAt: group.createdAt.toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }),
+    };
+  })
+    .sort((left, right) => left.name.localeCompare(right.name));
 
   return (
     <div className="space-y-5">
@@ -190,33 +323,17 @@ export default async function SubcategoriesPage() {
 
             <div>
               <label
-                htmlFor="categoryId"
                 className="mb-2 block text-sm font-medium text-zinc-700"
               >
                 Category
               </label>
-              <select
-                id="categoryId"
-                name="categoryId"
-                required
-                defaultValue=""
-                className="w-full rounded-full border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-950"
-              >
-                <option
-                  value=""
-                  disabled
-                >
-                  Select category
-                </option>
-                {categories.map((category) => (
-                  <option
-                    key={category.id}
-                    value={category.id}
-                  >
-                    {category.name} - {category.shop?.shopName ?? "All shops"}
-                  </option>
-                ))}
-              </select>
+              <BrandCategoryPicker
+                categories={categories.map((category) => ({
+                  id: category.id,
+                  name: category.name,
+                  shopName: category.shop?.shopName ?? "All shops",
+                }))}
+              />
             </div>
 
             <PendingSubmitButton
@@ -242,6 +359,7 @@ export default async function SubcategoriesPage() {
             name: category.name,
             shopName: category.shop?.shopName ?? "All shops",
           }))}
+          totalCategoryCount={totalCategoryCount}
           updateAction={updateSubcategory}
           deleteAction={deleteSubcategory}
         />

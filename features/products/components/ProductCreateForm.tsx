@@ -31,21 +31,25 @@ interface ProductCreateFormProps {
   action: (formData: FormData) => void;
 }
 
+const ALL_SHOPS_VALUE = "all";
+
 export function ProductCreateForm({
   shops,
   categories,
   subcategories,
   action,
 }: ProductCreateFormProps) {
-  const [shopId, setShopId] = useState(shops[0]?.id ?? "");
+  const [shopId, setShopId] = useState(ALL_SHOPS_VALUE);
   const [categoryId, setCategoryId] = useState("");
   const [galleryCount, setGalleryCount] = useState(0);
 
   const availableCategories = useMemo(
     () =>
-      categories.filter(
-        (category) => !category.shopId || category.shopId === shopId
-      ),
+      shopId === ALL_SHOPS_VALUE
+        ? categories
+        : categories.filter(
+            (category) => !category.shopId || category.shopId === shopId
+          ),
     [categories, shopId]
   );
 
@@ -58,6 +62,8 @@ export function ProductCreateForm({
   );
   const isMobileCategory =
     selectedCategory?.name.trim().toLowerCase() === "mobile";
+  const requiresSpecificShop =
+    isMobileCategory && shopId === ALL_SHOPS_VALUE;
 
   const availableSubcategories = useMemo(
     () =>
@@ -159,6 +165,9 @@ export function ProductCreateForm({
           }}
           className="w-full rounded-full border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-950"
         >
+          <option value={ALL_SHOPS_VALUE}>
+            All shops
+          </option>
           {shops.map((shop) => (
             <option
               key={shop.id}
@@ -192,7 +201,7 @@ export function ProductCreateForm({
               key={category.id}
               value={category.id}
             >
-              {category.name} - {category.shop?.shopName ?? "All shops"}
+              {category.name} 
             </option>
           ))}
         </select>
@@ -320,7 +329,8 @@ export function ProductCreateForm({
         disabled={
           shops.length === 0 ||
           availableCategories.length === 0 ||
-          availableSubcategories.length === 0
+          availableSubcategories.length === 0 ||
+          requiresSpecificShop
         }
         pendingLabel="Creating product..."
         className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
@@ -339,6 +349,11 @@ export function ProductCreateForm({
       {availableCategories.length > 0 && availableSubcategories.length === 0 ? (
         <p className="text-sm text-red-600">
           Create a brand under the selected category.
+        </p>
+      ) : null}
+      {requiresSpecificShop ? (
+        <p className="text-sm text-red-600">
+          Select a specific shop for mobile products with an IMEI number.
         </p>
       ) : null}
     </form>

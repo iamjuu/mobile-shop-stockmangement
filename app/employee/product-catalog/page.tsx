@@ -65,6 +65,7 @@ export default async function EmployeeProductCatalogPage() {
           productName: product.productName,
           categoryId: product.categoryId,
           categoryName: product.category.name,
+          subcategoryId: product.subcategoryId,
           shopName: product.shop.shopName,
           brandName: product.subcategory.name,
           purchasePrice: product.purchasePrice,

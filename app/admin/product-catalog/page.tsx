@@ -5,7 +5,7 @@ import { ProductCatalog } from "@/features/products/components/ProductCatalog";
 import { prisma } from "@/lib/prisma";
 
 export default async function ProductCatalogPage() {
-  const [categories, products] = await Promise.all([
+  const [categories, products, subcategories] = await Promise.all([
   prisma.category.findMany({
     include: {
       shop: true,
@@ -28,6 +28,11 @@ prisma.product.findMany({
   },
   orderBy: {
     productName: "asc",
+  },
+}),
+prisma.subCategory.findMany({
+  orderBy: {
+    name: "asc",
   },
 }),
 ]);
@@ -53,6 +58,7 @@ console.log(categories);
     productId: string,
     data: {
       productName: string;
+      subcategoryId: string;
       purchasePrice: number;
       price: number;
       stock: number;
@@ -65,6 +71,7 @@ console.log(categories);
 
     if (
       !productId ||
+      !data.subcategoryId ||
       productName.length < 2 ||
       data.purchasePrice < 0 ||
       data.price < 0 ||
@@ -76,12 +83,43 @@ console.log(categories);
       };
     }
 
+    const [product, subcategory] = await Promise.all([
+      prisma.product.findUnique({
+        where: {
+          id: productId,
+        },
+        select: {
+          categoryId: true,
+        },
+      }),
+      prisma.subCategory.findUnique({
+        where: {
+          id: data.subcategoryId,
+        },
+        select: {
+          categoryId: true,
+        },
+      }),
+    ]);
+
+    if (
+      !product ||
+      !subcategory ||
+      subcategory.categoryId !== product.categoryId
+    ) {
+      return {
+        ok: false,
+        message: "Invalid brand for this product category.",
+      };
+    }
+
     await prisma.product.update({
       where: {
         id: productId,
       },
       data: {
         productName,
+        subcategoryId: data.subcategoryId,
         purchasePrice: data.purchasePrice,
         price: data.price,
         stock: Math.trunc(data.stock),
@@ -194,12 +232,18 @@ async function deleteProduct(productId: string) {
           shopName: category.shop?.shopName ?? "All shops",
           productCount: category._count.products,
         }))}
+        subcategories={subcategories.map((subcategory) => ({
+          id: subcategory.id,
+          name: subcategory.name,
+          categoryId: subcategory.categoryId,
+        }))}
         products={products.map((product) => ({
           id: product.id,
           productCode: product.productCode,
           productName: product.productName,
           categoryId: product.categoryId,
           categoryName: product.category.name,
+          subcategoryId: product.subcategoryId,
           shopName: product.shop.shopName,
           brandName: product.subcategory.name,
           purchasePrice: product.purchasePrice,

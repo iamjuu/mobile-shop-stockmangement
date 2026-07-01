@@ -15,8 +15,10 @@ interface ProductDirectoryItem {
   productCode: string;
   productName: string;
   source?: "REGULAR" | "EXCHANGE_THIRD_PARTY";
-  shopName: string;
+  categoryId: string;
   categoryName: string;
+  subcategoryId: string;
+  shopName: string;
   subcategoryName: string;
   purchasePrice?: number | null;
   price: number;
@@ -32,10 +34,16 @@ type ProductDirectoryRow = ProductDirectoryItem & {
 
 interface ProductDirectoryProps {
   products: ProductDirectoryItem[];
+  subcategories?: Array<{
+    id: string;
+    name: string;
+    categoryId: string;
+  }>;
   updateAction: (
     productId: string,
     data: {
       productName: string;
+      subcategoryId: string;
       purchasePrice: number;
       price: number;
       stock: number;
@@ -73,6 +81,7 @@ function escapeHtml(value: string) {
 
 export function ProductDirectory({
   products,
+  subcategories = [],
   updateAction,
   deleteAction,
   duplicateAction,
@@ -91,6 +100,15 @@ export function ProductDirectory({
     useState<"ALL" | "REGULAR" | "EXCHANGE_THIRD_PARTY">("REGULAR");
   const [currentPage, setCurrentPage] = useState(1);
   const qrRef = useRef<HTMLDivElement>(null);
+  const editBrandOptions = useMemo(
+    () =>
+      editProduct
+        ? subcategories.filter(
+            (subcategory) => subcategory.categoryId === editProduct.categoryId
+          )
+        : [],
+    [editProduct, subcategories]
+  );
 
   const qrValue = useMemo(() => {
     if (!selectedProduct) {
@@ -380,8 +398,13 @@ export function ProductDirectory({
     setIsSaving(true);
 
     try {
+      const subcategoryId = String(formData.get("subcategoryId") ?? "");
+      const selectedBrand = subcategories.find(
+        (subcategory) => subcategory.id === subcategoryId
+      );
       const updatedProduct = {
         productName: String(formData.get("productName") ?? ""),
+        subcategoryId,
         purchasePrice: Number(formData.get("purchasePrice") ?? 0),
         price: Number(formData.get("price") ?? 0),
         stock: Number(formData.get("stock") ?? 0),
@@ -392,6 +415,8 @@ export function ProductDirectory({
       showToast(result.message);
 
       if (result.ok) {
+        const subcategoryName =
+          selectedBrand?.name ?? editProduct.subcategoryName;
         setLocalProducts((currentProducts) =>
           currentProducts.map((product) =>
             product.id === editProduct.id
@@ -399,6 +424,7 @@ export function ProductDirectory({
                   ...product,
                   ...updatedProduct,
                   productName: updatedProduct.productName.trim(),
+                  subcategoryName,
                   stock: Math.trunc(updatedProduct.stock),
                   description: updatedProduct.description.trim() || null,
                 }
@@ -817,6 +843,30 @@ export function ProductDirectory({
                   className="w-full rounded-full border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-950"
                 />
               </div>
+
+              {editBrandOptions.length > 0 ? (
+                <div>
+                  <label
+                    htmlFor="editSubcategoryId"
+                    className="mb-2 block text-sm font-medium text-zinc-700"
+                  >
+                    Brand
+                  </label>
+                  <select
+                    id="editSubcategoryId"
+                    name="subcategoryId"
+                    required
+                    defaultValue={editProduct.subcategoryId}
+                    className="w-full rounded-full border border-zinc-300 bg-white px-4 py-3 text-sm outline-none focus:border-zinc-950"
+                  >
+                    {editBrandOptions.map((subcategory) => (
+                      <option key={subcategory.id} value={subcategory.id}>
+                        {subcategory.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
 
               <div className="grid gap-4 sm:grid-cols-3">
                 <div>

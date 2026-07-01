@@ -15,12 +15,19 @@ interface ProductCatalogCategory {
   productCount: number;
 }
 
+interface SubcategoryOption {
+  id: string;
+  name: string;
+  categoryId: string;
+}
+
 interface ProductCatalogItem {
   id: string;
   productCode: string;
   productName: string;
   categoryId: string;
   categoryName: string;
+  subcategoryId: string;
   shopName: string;
   brandName: string;
   purchasePrice?: number | null;
@@ -36,10 +43,12 @@ interface ProductCatalogItem {
 interface ProductCatalogProps {
   categories: ProductCatalogCategory[];
   products: ProductCatalogItem[];
+  subcategories?: SubcategoryOption[];
   updateAction?: (
     productId: string,
     data: {
       productName: string;
+      subcategoryId: string;
       purchasePrice: number;
       price: number;
       stock: number;
@@ -64,6 +73,7 @@ const currency = new Intl.NumberFormat("en-IN", {
 export function ProductCatalog({
   categories,
   products,
+  subcategories = [],
   updateAction,
   deleteAction,
 }: ProductCatalogProps) {
@@ -86,6 +96,15 @@ export function ProductCatalog({
   const [toast, setToast] = useState<string | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState(
     categories[0]?.id ?? ""
+  );
+  const editBrandOptions = useMemo(
+    () =>
+      editProduct
+        ? subcategories.filter(
+            (subcategory) => subcategory.categoryId === editProduct.categoryId
+          )
+        : [],
+    [editProduct, subcategories]
   );
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -195,8 +214,13 @@ export function ProductCatalog({
     setIsSaving(true);
 
     try {
+      const subcategoryId = String(formData.get("subcategoryId") ?? "");
+      const selectedBrand = subcategories.find(
+        (subcategory) => subcategory.id === subcategoryId
+      );
       const updatedProduct = {
         productName: String(formData.get("productName") ?? ""),
+        subcategoryId,
         purchasePrice: Number(formData.get("purchasePrice") ?? 0),
         price: Number(formData.get("price") ?? 0),
         stock: Number(formData.get("stock") ?? 0),
@@ -207,6 +231,7 @@ export function ProductCatalog({
       showToast(result.message);
 
       if (result.ok) {
+        const brandName = selectedBrand?.name ?? editProduct.brandName;
         setLocalProducts((currentProducts) =>
           currentProducts.map((product) =>
             product.id === editProduct.id
@@ -214,6 +239,7 @@ export function ProductCatalog({
                   ...product,
                   ...updatedProduct,
                   productName: updatedProduct.productName.trim(),
+                  brandName,
                   stock: Math.trunc(updatedProduct.stock),
                   description: updatedProduct.description.trim() || null,
                 }
@@ -226,6 +252,7 @@ export function ProductCatalog({
                 ...currentProduct,
                 ...updatedProduct,
                 productName: updatedProduct.productName.trim(),
+                brandName,
                 stock: Math.trunc(updatedProduct.stock),
                 description: updatedProduct.description.trim() || null,
               }
@@ -683,6 +710,30 @@ export function ProductCatalog({
                   className="w-full rounded-full border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-950"
                 />
               </div>
+
+              {editBrandOptions.length > 0 ? (
+                <div>
+                  <label
+                    htmlFor="catalogEditSubcategoryId"
+                    className="mb-2 block text-sm font-medium text-zinc-700"
+                  >
+                    Brand
+                  </label>
+                  <select
+                    id="catalogEditSubcategoryId"
+                    name="subcategoryId"
+                    required
+                    defaultValue={editProduct.subcategoryId}
+                    className="w-full rounded-full border border-zinc-300 bg-white px-4 py-3 text-sm outline-none focus:border-zinc-950"
+                  >
+                    {editBrandOptions.map((subcategory) => (
+                      <option key={subcategory.id} value={subcategory.id}>
+                        {subcategory.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
 
               <div className="grid gap-4 sm:grid-cols-3">
                 <div>

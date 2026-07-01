@@ -4,12 +4,20 @@ import { useMemo, useState } from "react";
 import { Loader2, Pencil, Trash2, X } from "lucide-react";
 
 import { TablePagination } from "@/components/table-pagination";
+import { BrandCategoryCell } from "@/features/subcategories/components/BrandCategoryCell";
+import { BrandCategoryPicker } from "@/features/subcategories/components/BrandCategoryPicker";
 
-interface BrandItem {
+interface BrandCategory {
   id: string;
   name: string;
-  categoryId: string;
-  categoryName: string;
+  shopName: string;
+}
+
+interface BrandItem {
+  ids: string[];
+  name: string;
+  categories: BrandCategory[];
+  isAllCategories: boolean;
   shopName: string;
   createdAt: string;
 }
@@ -23,17 +31,18 @@ interface CategoryOption {
 interface BrandDirectoryProps {
   brands: BrandItem[];
   categories: CategoryOption[];
+  totalCategoryCount: number;
   updateAction: (
-    brandId: string,
+    subcategoryIds: string[],
     data: {
       name: string;
-      categoryId: string;
+      categoryIds: string[];
     }
   ) => Promise<{
     ok: boolean;
     message: string;
   }>;
-  deleteAction: (brandId: string) => Promise<{
+  deleteAction: (subcategoryIds: string[]) => Promise<{
     ok: boolean;
     message: string;
   }>;
@@ -44,6 +53,7 @@ const PAGE_SIZE = 7;
 export function BrandDirectory({
   brands,
   categories,
+  totalCategoryCount,
   updateAction,
   deleteAction,
 }: BrandDirectoryProps) {
@@ -73,9 +83,15 @@ export function BrandDirectory({
     setIsSaving(true);
 
     try {
-      const result = await updateAction(editBrand.id, {
+      const categoryScope = String(formData.get("categoryScope") ?? "");
+      const categoryIds =
+        categoryScope === "all"
+          ? categories.map((category) => category.id)
+          : formData.getAll("categoryIds").map((value) => String(value));
+
+      const result = await updateAction(editBrand.ids, {
         name: String(formData.get("name") ?? ""),
-        categoryId: String(formData.get("categoryId") ?? ""),
+        categoryIds,
       });
 
       showToast(result.message);
@@ -96,7 +112,7 @@ export function BrandDirectory({
     setIsDeleting(true);
 
     try {
-      const result = await deleteAction(deleteBrand.id);
+      const result = await deleteAction(deleteBrand.ids);
 
       showToast(result.message);
 
@@ -136,7 +152,7 @@ export function BrandDirectory({
           <tbody className="divide-y divide-zinc-100 text-sm">
             {brands.length > 0 ? (
               paginatedBrands.map((brand) => (
-                <tr key={brand.id} className="transition hover:bg-zinc-50">
+                <tr key={brand.ids.join("-")} className="transition hover:bg-zinc-50">
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 text-sm font-semibold text-zinc-700">
@@ -151,9 +167,10 @@ export function BrandDirectory({
                     </div>
                   </td>
                   <td className="px-5 py-4">
-                    <span className="inline-flex rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700">
-                      {brand.categoryName}
-                    </span>
+                    <BrandCategoryCell
+                      categories={brand.categories}
+                      isAllCategories={brand.isAllCategories}
+                    />
                   </td>
                   <td className="px-5 py-4 text-zinc-600">
                     {brand.shopName}
@@ -252,25 +269,19 @@ export function BrandDirectory({
             </div>
 
             <div>
-              <label
-                htmlFor="editBrandCategory"
-                className="mb-2 block text-sm font-medium text-zinc-700"
-              >
+              <label className="mb-2 block text-sm font-medium text-zinc-700">
                 Category
               </label>
-              <select
-                id="editBrandCategory"
-                name="categoryId"
-                defaultValue={editBrand.categoryId}
-                required
-                className="w-full rounded-full border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-950"
-              >
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name} - {category.shopName}
-                  </option>
-                ))}
-              </select>
+              <BrandCategoryPicker
+                categories={categories}
+                defaultCategoryIds={editBrand.categories.map(
+                  (category) => category.id
+                )}
+                defaultAllCategories={
+                  editBrand.isAllCategories &&
+                  editBrand.categories.length === totalCategoryCount
+                }
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-3 pt-2">
@@ -324,7 +335,7 @@ export function BrandDirectory({
             </button>
           </div>
           <p className="mt-4 text-sm leading-6 text-zinc-600">
-            This will delete the brand if no products are using it.
+            This will delete the brand from all selected categories if no products are using it.
           </p>
 
           <div className="mt-5 grid grid-cols-2 gap-3">
