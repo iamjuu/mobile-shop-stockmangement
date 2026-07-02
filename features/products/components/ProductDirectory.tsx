@@ -1,7 +1,15 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
-import { Download, Loader2, Pencil, Plus, Printer, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Download,
+  Loader2,
+  Pencil,
+  Plus,
+  Printer,
+  Trash2,
+  X,
+} from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
@@ -26,6 +34,7 @@ interface ProductDirectoryItem {
   mainImageUrl?: string | null;
   galleryImageUrls?: string[];
   description?: string | null;
+  createdAt: string | Date; // add this
 }
 
 type ProductDirectoryRow = ProductDirectoryItem & {
@@ -48,7 +57,7 @@ interface ProductDirectoryProps {
       price: number;
       stock: number;
       description?: string;
-    }
+    },
   ) => Promise<{
     ok: boolean;
     message: string;
@@ -88,26 +97,37 @@ export function ProductDirectory({
 }: ProductDirectoryProps) {
   const router = useRouter();
   const [localProducts, setLocalProducts] = useState(products);
+
+  useEffect(() => {
+    setLocalProducts(products);
+  }, [products]);
+
   const [selectedProduct, setSelectedProduct] =
     useState<ProductDirectoryItem | null>(null);
-  const [editProduct, setEditProduct] =
-    useState<ProductDirectoryItem | null>(null);
+  const [editProduct, setEditProduct] = useState<ProductDirectoryItem | null>(
+    null,
+  );
   const [toast, setToast] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
-  const [duplicatingProductId, setDuplicatingProductId] = useState<string | null>(null);
-  const [sourceFilter, setSourceFilter] =
-    useState<"ALL" | "REGULAR" | "EXCHANGE_THIRD_PARTY">("REGULAR");
+  const [deletingProductId, setDeletingProductId] = useState<string | null>(
+    null,
+  );
+  const [duplicatingProductId, setDuplicatingProductId] = useState<
+    string | null
+  >(null);
+  const [sourceFilter, setSourceFilter] = useState<
+    "ALL" | "REGULAR" | "EXCHANGE_THIRD_PARTY"
+  >("REGULAR");
   const [currentPage, setCurrentPage] = useState(1);
   const qrRef = useRef<HTMLDivElement>(null);
   const editBrandOptions = useMemo(
     () =>
       editProduct
         ? subcategories.filter(
-            (subcategory) => subcategory.categoryId === editProduct.categoryId
+            (subcategory) => subcategory.categoryId === editProduct.categoryId,
           )
         : [],
-    [editProduct, subcategories]
+    [editProduct, subcategories],
   );
 
   const qrValue = useMemo(() => {
@@ -123,68 +143,70 @@ export function ProductDirectory({
       subcategory: selectedProduct.subcategoryName,
       purchasePrice: selectedProduct.purchasePrice ?? 0,
       price: selectedProduct.price,
-      profitPerSale: selectedProduct.price - (selectedProduct.purchasePrice ?? 0),
+      profitPerSale:
+        selectedProduct.price - (selectedProduct.purchasePrice ?? 0),
       stock: selectedProduct.stock,
     });
   }, [selectedProduct]);
-  const visibleProducts = useMemo(
-    () => {
-      const filteredProducts = localProducts.filter(
-        (product) =>
-          sourceFilter === "ALL" ||
-          (product.source ?? "REGULAR") === sourceFilter
-      );
-      const groupedProducts = new Map<string, ProductDirectoryRow>();
+  const visibleProducts = useMemo(() => {
+    const filteredProducts = localProducts.filter(
+      (product) =>
+        sourceFilter === "ALL" ||
+        (product.source ?? "REGULAR") === sourceFilter,
+    );
+    const groupedProducts = new Map<string, ProductDirectoryRow>();
 
-      filteredProducts.forEach((product) => {
-        const source = product.source ?? "REGULAR";
-        const groupKey =
-          source === "EXCHANGE_THIRD_PARTY"
-            ? product.id
-            : [
-                source,
-                product.productName.trim().toLowerCase(),
-                product.shopName,
-                product.categoryName,
-                product.subcategoryName,
-                product.purchasePrice ?? 0,
-                product.price,
-                product.mainImageUrl ?? "",
-                product.description ?? "",
-              ].join("|");
-        const existingProduct = groupedProducts.get(groupKey);
+    filteredProducts.forEach((product) => {
+      const source = product.source ?? "REGULAR";
+      const groupKey =
+        source === "EXCHANGE_THIRD_PARTY"
+          ? product.id
+          : [
+              source,
+              product.productName.trim().toLowerCase(),
+              product.shopName,
+              product.categoryName,
+              product.subcategoryName,
+              product.purchasePrice ?? 0,
+              product.price,
+              product.mainImageUrl ?? "",
+              product.description ?? "",
+            ].join("|");
+      const existingProduct = groupedProducts.get(groupKey);
 
-        if (!existingProduct) {
-          groupedProducts.set(groupKey, {
-            ...product,
-            recordCount: 1,
-          });
-          return;
-        }
-
-        const shouldUseThisProduct =
-          existingProduct.stock <= 0 && product.stock > 0;
-
+      if (!existingProduct) {
         groupedProducts.set(groupKey, {
-          ...(shouldUseThisProduct ? product : existingProduct),
-          stock: existingProduct.stock + product.stock,
-          recordCount: existingProduct.recordCount + 1,
+          ...product,
+          recordCount: 1,
         });
-      });
+        return;
+      }
 
-      return Array.from(groupedProducts.values());
-    },
-    [localProducts, sourceFilter]
-  );
+      const existingTime = new Date(existingProduct.createdAt).getTime();
+      const currentTime = new Date(product.createdAt).getTime();
+      const shouldUseThisProduct = currentTime > existingTime;
+
+      groupedProducts.set(groupKey, {
+        ...(shouldUseThisProduct ? product : existingProduct),
+        stock: existingProduct.stock + product.stock,
+        recordCount: existingProduct.recordCount + 1,
+      });
+    });
+
+    return Array.from(groupedProducts.values()).sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+  }, [localProducts, sourceFilter]);
   const totalPages = Math.max(1, Math.ceil(visibleProducts.length / PAGE_SIZE));
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const paginatedProducts = useMemo(
     () =>
       visibleProducts.slice(
         (safeCurrentPage - 1) * PAGE_SIZE,
-        safeCurrentPage * PAGE_SIZE
+        safeCurrentPage * PAGE_SIZE,
       ),
-    [safeCurrentPage, visibleProducts]
+    [safeCurrentPage, visibleProducts],
   );
 
   function getQrSvgMarkup() {
@@ -246,11 +268,13 @@ export function ProductDirectory({
     const categoryName = escapeHtml(selectedProduct.categoryName);
     const subcategoryName = escapeHtml(selectedProduct.subcategoryName);
     const purchasePrice = escapeHtml(
-      currency.format(selectedProduct.purchasePrice ?? 0)
+      currency.format(selectedProduct.purchasePrice ?? 0),
     );
     const price = escapeHtml(currency.format(selectedProduct.price));
     const profit = escapeHtml(
-      currency.format(selectedProduct.price - (selectedProduct.purchasePrice ?? 0))
+      currency.format(
+        selectedProduct.price - (selectedProduct.purchasePrice ?? 0),
+      ),
     );
 
     printWindow.document.write(`
@@ -332,7 +356,7 @@ export function ProductDirectory({
 
   async function handleDelete(product: ProductDirectoryItem) {
     const ok = window.confirm(
-      `Delete ${product.productName}? This action cannot be undone.`
+      `Delete ${product.productName}? This action cannot be undone.`,
     );
 
     if (!ok) {
@@ -348,14 +372,14 @@ export function ProductDirectory({
       if (result.ok) {
         setLocalProducts((currentProducts) =>
           currentProducts.filter(
-            (currentProduct) => currentProduct.id !== product.id
-          )
+            (currentProduct) => currentProduct.id !== product.id,
+          ),
         );
         setSelectedProduct((currentProduct) =>
-          currentProduct?.id === product.id ? null : currentProduct
+          currentProduct?.id === product.id ? null : currentProduct,
         );
         setEditProduct((currentProduct) =>
-          currentProduct?.id === product.id ? null : currentProduct
+          currentProduct?.id === product.id ? null : currentProduct,
         );
         router.refresh();
       }
@@ -400,7 +424,7 @@ export function ProductDirectory({
     try {
       const subcategoryId = String(formData.get("subcategoryId") ?? "");
       const selectedBrand = subcategories.find(
-        (subcategory) => subcategory.id === subcategoryId
+        (subcategory) => subcategory.id === subcategoryId,
       );
       const updatedProduct = {
         productName: String(formData.get("productName") ?? ""),
@@ -428,8 +452,8 @@ export function ProductDirectory({
                   stock: Math.trunc(updatedProduct.stock),
                   description: updatedProduct.description.trim() || null,
                 }
-              : product
-          )
+              : product,
+          ),
         );
         setEditProduct(null);
         router.refresh();
@@ -444,9 +468,7 @@ export function ProductDirectory({
       <section className="overflow-hidden rounded-[24px] border border-zinc-200 bg-white">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 px-5 py-4">
           <div>
-            <h2 className="text-lg font-semibold">
-              Product directory
-            </h2>
+            <h2 className="text-lg font-semibold">Product directory</h2>
             <p className="mt-1 text-sm text-zinc-500">
               {visibleProducts.length} products shown
             </p>
@@ -463,7 +485,7 @@ export function ProductDirectory({
                 onClick={() => {
                   setCurrentPage(1);
                   setSourceFilter(
-                    value as "ALL" | "REGULAR" | "EXCHANGE_THIRD_PARTY"
+                    value as "ALL" | "REGULAR" | "EXCHANGE_THIRD_PARTY",
                   );
                 }}
                 className={`rounded-full px-4 py-2 text-xs font-semibold ${
@@ -499,16 +521,13 @@ export function ProductDirectory({
                 paginatedProducts.map((product) => (
                   <tr
                     key={product.id}
-                    className={`transition hover:bg-zinc-50 ${
+                    className={`group transition hover:bg-zinc-50 ${
                       product.stock <= 0
                         ? "cursor-not-allowed opacity-70"
                         : "cursor-pointer"
                     }`}
-                    onClick={() => {
-                      handleOpenProductQr(product);
-                    }}
                   >
-                    <td className="px-5 py-4">
+                    <td className="sticky left-0 z-20 min-w-[320px] bg-white px-5 py-4">
                       <div className="flex items-center gap-3">
                         {product.mainImageUrl ? (
                           <div className="size-12 shrink-0 overflow-hidden rounded-full bg-zinc-100">
@@ -526,19 +545,23 @@ export function ProductDirectory({
                             {product.productName.slice(0, 1).toUpperCase()}
                           </div>
                         )}
+
                         <div>
                           <p className="font-medium text-zinc-950">
                             {product.productName}
                           </p>
+
                           <div className="mt-1 flex flex-wrap items-center gap-2">
                             <p className="text-xs text-zinc-500">
                               {product.productCode}
                             </p>
+
                             {product.recordCount > 1 ? (
                               <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-zinc-600">
                                 {product.recordCount} records
                               </span>
                             ) : null}
+
                             {(product.source ?? "REGULAR") ===
                             "EXCHANGE_THIRD_PARTY" ? (
                               <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-700">
@@ -567,7 +590,9 @@ export function ProductDirectory({
                       {currency.format(product.price)}
                     </td>
                     <td className="px-5 py-4 font-medium text-emerald-700">
-                      {currency.format(product.price - (product.purchasePrice ?? 0))}
+                      {currency.format(
+                        product.price - (product.purchasePrice ?? 0),
+                      )}
                     </td>
                     <td className="px-5 py-4">
                       <span
@@ -582,72 +607,76 @@ export function ProductDirectory({
                         {product.stock} units
                       </span>
                     </td>
-                    <td className="px-5 py-4">
-                      <div className="flex justify-end gap-2">
-                        {(product.source ?? "REGULAR") === "REGULAR" ? (
-                          <button
-                            type="button"
-                            disabled={duplicatingProductId === product.id}
-                            aria-busy={duplicatingProductId === product.id}
-                            className="inline-flex items-center gap-1 rounded-full border border-zinc-300 px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:text-zinc-400"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleDuplicateProduct(product);
-                            }}
-                          >
-                            {duplicatingProductId === product.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Plus className="h-3.5 w-3.5" />
-                            )}
-                            Add Product
-                          </button>
-                        ) : null}
-                        <button
-                          type="button"
-                          aria-disabled={product.stock <= 0}
-                          className={`rounded-full border px-3 py-2 text-xs font-semibold ${
-                            product.stock <= 0
-                              ? "cursor-not-allowed border-zinc-200 text-zinc-400"
-                              : "border-zinc-300 text-zinc-700 hover:bg-zinc-100"
-                          }`}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleOpenProductQr(product);
-                          }}
-                        >
-                          QR
-                        </button>
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-1 rounded-full px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setEditProduct(product);
-                          }}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                          
-                        </button>
-                        <button
-                          type="button"
-                          disabled={deletingProductId === product.id}
-                          aria-busy={deletingProductId === product.id}
-                          className="inline-flex items-center gap-1 rounded-full px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-zinc-400"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleDelete(product);
-                          }}
-                        >
-                          {deletingProductId === product.id ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-3.5 w-3.5" />
-                          )}
-                          
-                        </button>
-                      </div>
-                    </td>
+               <td className="px-5 py-4">
+  <div className="flex items-center justify-end gap-2">
+    {(product.source ?? "REGULAR") === "REGULAR" && (
+      <button
+        type="button"
+        disabled={duplicatingProductId === product.id}
+        aria-busy={duplicatingProductId === product.id}
+        className="inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap text-[12px]  rounded-full border border-zinc-300 px-5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:text-zinc-400"
+        onClick={(event) => {
+          event.stopPropagation();
+          handleDuplicateProduct(product);
+        }}
+      >
+        {duplicatingProductId === product.id ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Plus className="h-3 w-3" />
+        )}
+        Add Product
+      </button>
+    )}
+
+    {/* QR */}
+    <button
+      type="button"
+      aria-disabled={product.stock <= 0}
+      className={`flex h-11 w-11 items-center justify-center rounded-full border transition ${
+        product.stock <= 0
+          ? "cursor-not-allowed border-zinc-200 text-zinc-400"
+          : "border-zinc-300 text-zinc-700 hover:bg-zinc-100"
+      }`}
+      onClick={(event) => {
+        event.stopPropagation();
+        handleOpenProductQr(product);
+      }}
+    >
+      <span className="text-[12px] font-semibold">QR</span>
+    </button>
+
+    {/* Edit */}
+    <button
+      type="button"
+      className="flex h-11 w-11 items-center justify-center rounded-full text-zinc-700 transition hover:bg-zinc-100"
+      onClick={(event) => {
+        event.stopPropagation();
+        setEditProduct(product);
+      }}
+    >
+      <Pencil className="h-4 w-4" />
+    </button>
+
+    {/* Delete */}
+    <button
+      type="button"
+      disabled={deletingProductId === product.id}
+      aria-busy={deletingProductId === product.id}
+      className="flex h-11 w-11 items-center justify-center rounded-full text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:text-zinc-400"
+      onClick={(event) => {
+        event.stopPropagation();
+        handleDelete(product);
+      }}
+    >
+      {deletingProductId === product.id ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <Trash2 className="h-4 w-4" />
+      )}
+    </button>
+  </div>
+</td>
                   </tr>
                 ))
               ) : (
@@ -707,10 +736,7 @@ export function ProductDirectory({
                     className="mb-5 aspect-square w-full max-w-[180px] rounded-3xl object-cover"
                   />
                 ) : null}
-                <div
-                  ref={qrRef}
-                  className="rounded-2xl bg-white p-4"
-                >
+                <div ref={qrRef} className="rounded-2xl bg-white p-4">
                   <QRPreview value={qrValue} />
                 </div>
                 <p className="mt-4 text-center text-xs font-medium text-zinc-500">
@@ -765,12 +791,16 @@ export function ProductDirectory({
                   ["Shop", selectedProduct.shopName],
                   ["Category", selectedProduct.categoryName],
                   ["Brand", selectedProduct.subcategoryName],
-                  ["Purchase Price", currency.format(selectedProduct.purchasePrice ?? 0)],
+                  [
+                    "Purchase Price",
+                    currency.format(selectedProduct.purchasePrice ?? 0),
+                  ],
                   ["Selling Price", currency.format(selectedProduct.price)],
                   [
                     "Profit Per Sale",
                     currency.format(
-                      selectedProduct.price - (selectedProduct.purchasePrice ?? 0)
+                      selectedProduct.price -
+                        (selectedProduct.purchasePrice ?? 0),
                     ),
                   ],
                   ["Stock", `${selectedProduct.stock} units`],
@@ -824,10 +854,7 @@ export function ProductDirectory({
               </button>
             </div>
 
-            <form
-              action={handleUpdate}
-              className="space-y-4 p-5"
-            >
+            <form action={handleUpdate} className="space-y-4 p-5">
               <div>
                 <label
                   htmlFor="editProductName"

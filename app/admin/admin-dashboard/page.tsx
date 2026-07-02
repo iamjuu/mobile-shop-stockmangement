@@ -160,9 +160,7 @@ export default async function DashboardPage() {
         <div className="grid gap-6 p-[10px] lg:grid-cols-[1fr_360px]">
           <div className="flex min-h-[280px] flex-col justify-between rounded-[24px] bg-zinc-950 p-7 text-white">
             <div>
-              <p className="text-sm font-medium text-zinc-300">
-                Welcome back
-              </p>
+              <p className="text-sm font-medium text-zinc-300">Welcome back</p>
               <h2 className="mt-3 max-w-2xl text-4xl font-semibold tracking-normal sm:text-5xl">
                 Keep every shop stocked and every sale ready.
               </h2>
@@ -196,9 +194,7 @@ export default async function DashboardPage() {
                 <p className="text-sm font-medium text-zinc-600">
                   Setup progress
                 </p>
-                <p className="mt-2 text-5xl font-semibold">
-                  {setupPercent}%
-                </p>
+                <p className="mt-2 text-5xl font-semibold">{setupPercent}%</p>
               </div>
               <Tags className="h-8 w-8 text-zinc-800" />
             </div>
@@ -239,7 +235,7 @@ export default async function DashboardPage() {
                   <Icon className="h-5 w-5" />
                 </div>
               </div>
-              <p className="mt-5 text-4xl font-semibold">{stat.value}</p>
+              <p className="mt-5 text-xl font-semibold">{stat.value}</p>
               <p className="mt-2 text-sm text-zinc-500">{stat.detail}</p>
             </div>
           );
@@ -251,33 +247,34 @@ export default async function DashboardPage() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <h3 className="text-2xl font-semibold">Shops</h3>
-              <p className="mt-1 text-sm text-zinc-500">
-                Active store list
-              </p>
+              <p className="mt-1 text-sm text-zinc-500">Active store list</p>
             </div>
             <Store className="h-7 w-7 text-zinc-700" />
           </div>
 
-          <div className="mt-6 space-y-3">
+          <div className="scrollbar-hover mt-6 max-h-[285px] overflow-y-auto pr-2">
             {shops.length > 0 ? (
-              shops.map((shop) => (
-                <div
-                  key={shop.id}
-                  className="flex items-center justify-between gap-3 rounded-2xl bg-zinc-50 px-4 py-4"
-                >
-                  <div>
-                    <p className="font-medium text-zinc-950">
-                      {shop.shopName}
-                    </p>
-                    <p className="text-sm text-zinc-500">
-                      {shop.phone || "Phone not added"}
-                    </p>
+              <div className="space-y-3">
+                {shops.map((shop) => (
+                  <div
+                    key={shop.id}
+                    className="flex items-center justify-between gap-3 rounded-2xl bg-zinc-50 px-4 py-4 transition hover:bg-zinc-100"
+                  >
+                    <div>
+                      <p className="font-medium text-zinc-950">
+                        {shop.shopName}
+                      </p>
+                      <p className="text-sm text-zinc-500">
+                        {shop.phone || "Phone not added"}
+                      </p>
+                    </div>
+
+                    <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-zinc-700 shadow-sm">
+                      {shop.shopCode}
+                    </span>
                   </div>
-                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-zinc-700">
-                    {shop.shopCode}
-                  </span>
-                </div>
-              ))
+                ))}
+              </div>
             ) : (
               <div className="rounded-2xl bg-zinc-50 px-4 py-8 text-center text-sm text-zinc-500">
                 No shops found.
@@ -316,35 +313,40 @@ export default async function DashboardPage() {
                 Product names with current units
               </p>
             </div>
+
             <Boxes className="h-7 w-7 text-zinc-700" />
           </div>
 
-          <div className="mt-6 space-y-3">
+          {/* Scrollable List */}
+          <div className="scrollbar-hover mt-6 max-h-[285px] overflow-y-auto pr-2">
             {availableStockProducts.length > 0 ? (
-              availableStockProducts.map((product) => (
-                <div
-                  key={product.id}
-                  className="flex items-center justify-between gap-3 rounded-2xl bg-zinc-50 px-4 py-4"
-                >
-                  <div>
-                    <p className="font-medium text-zinc-950">
-                      {product.productName}
-                    </p>
-                    <p className="text-sm text-zinc-500">
-                      {product.shop.shopName}
-                    </p>
-                  </div>
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                      product.stock <= 5
-                        ? "bg-amber-50 text-amber-700"
-                        : "bg-emerald-50 text-emerald-700"
-                    }`}
+              <div className="space-y-3">
+                {availableStockProducts.map((product) => (
+                  <div
+                    key={product.id}
+                    className="flex items-center justify-between gap-3 rounded-2xl bg-zinc-50 px-4 py-4 transition hover:bg-zinc-100"
                   >
-                    {product.stock} units
-                  </span>
-                </div>
-              ))
+                    <div>
+                      <p className="font-medium text-zinc-950">
+                        {product.productName}
+                      </p>
+                      <p className="text-sm text-zinc-500">
+                        {product.shop.shopName}
+                      </p>
+                    </div>
+
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        product.stock <= 5
+                          ? "bg-amber-50 text-amber-700"
+                          : "bg-emerald-50 text-emerald-700"
+                      }`}
+                    >
+                      {product.stock} units
+                    </span>
+                  </div>
+                ))}
+              </div>
             ) : (
               <div className="rounded-2xl bg-zinc-50 px-4 py-8 text-center text-sm text-zinc-500">
                 No products found.
@@ -355,6 +357,7 @@ export default async function DashboardPage() {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1fr_380px]">
+        {/* Inventory Health */}
         <div className="rounded-[24px] border border-zinc-200 bg-white p-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
@@ -363,38 +366,46 @@ export default async function DashboardPage() {
                 Products with five or fewer stock units need attention.
               </p>
             </div>
+
             <Link
               href="/admin/inventory"
-              className="inline-flex items-center gap-2 rounded-full border border-zinc-300 px-4 py-2 text-sm font-medium"
+              className="inline-flex items-center gap-2 rounded-full border border-zinc-300 px-4 py-2 text-sm font-medium hover:bg-zinc-50"
             >
               Open Inventory
               <ArrowUpRight className="h-4 w-4" />
             </Link>
           </div>
 
-          <div className="mt-6 grid gap-3">
+          {/* Scrollable List */}
+          <div className="scrollbar-hover mt-6 max-h-[285px] overflow-y-auto pr-2">
             {lowStockItems.length > 0 ? (
-              lowStockItems.map((product) => (
-                <div
-                  key={product.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-zinc-50 px-4 py-4"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-full bg-amber-100 text-amber-700">
-                      <AlertTriangle className="h-5 w-5" />
+              <div className="grid gap-3">
+                {lowStockItems.map((product) => (
+                  <div
+                    key={product.id}
+                    className="flex items-center justify-between gap-3 rounded-2xl bg-zinc-50 px-4 py-4 transition hover:bg-zinc-100"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                        <AlertTriangle className="h-5 w-5" />
+                      </div>
+
+                      <div>
+                        <p className="font-medium text-zinc-900">
+                          {product.productName}
+                        </p>
+                        <p className="text-sm text-zinc-500">
+                          {product.shop.shopName} • {product.productCode}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">{product.productName}</p>
-                      <p className="text-sm text-zinc-500">
-                        {product.shop.shopName} - {product.productCode}
-                      </p>
-                    </div>
+
+                    <span className="rounded-full bg-white px-4 py-2 text-sm font-semibold shadow-sm">
+                      {product.stock} left
+                    </span>
                   </div>
-                  <p className="rounded-full bg-white px-4 py-2 text-sm font-semibold">
-                    {product.stock} left
-                  </p>
-                </div>
-              ))
+                ))}
+              </div>
             ) : (
               <div className="rounded-2xl bg-zinc-50 px-4 py-8 text-center text-sm text-zinc-500">
                 No low-stock products found.
@@ -403,14 +414,14 @@ export default async function DashboardPage() {
           </div>
         </div>
 
+        {/* Quick Actions */}
         <div className="rounded-[24px] bg-zinc-950 p-6 text-white">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-2xl font-semibold">Quick actions</h3>
-              <p className="mt-1 text-sm text-zinc-400">
-                Common admin tasks
-              </p>
+              <p className="mt-1 text-sm text-zinc-400">Common admin tasks</p>
             </div>
+
             <ReceiptText className="h-7 w-7 text-[#ffdc5d]" />
           </div>
 
@@ -424,7 +435,7 @@ export default async function DashboardPage() {
               <Link
                 key={label}
                 href={href}
-                className="flex items-center justify-between rounded-2xl bg-white/10 px-4 py-4 text-sm font-medium hover:bg-white/15"
+                className="flex items-center justify-between rounded-2xl bg-white/10 px-4 py-4 text-sm font-medium transition hover:bg-white/20"
               >
                 {label}
                 <ArrowUpRight className="h-4 w-4" />

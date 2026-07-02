@@ -403,6 +403,8 @@ export default async function ProductsPage() {
         mainImageUrl: newProduct.mainImageUrl ?? newProduct.imageUrl,
         galleryImageUrls: newProduct.galleryImageUrls,
         description: newProduct.description,
+          createdAt: newProduct.createdAt, // add this
+
       },
     };
   }
@@ -426,23 +428,24 @@ export default async function ProductsPage() {
     name: subcategory.name,
     categoryId: subcategory.categoryId,
   }));
-  const directoryProducts = products.map((product) => ({
-    id: product.id,
-    productCode: product.productCode,
-    productName: product.productName,
-    source: product.source ?? "REGULAR",
-    categoryId: product.categoryId,
-    shopName: product.shop.shopName,
-    categoryName: product.category.name,
-    subcategoryId: product.subcategoryId,
-    subcategoryName: product.subcategory.name,
-    purchasePrice: product.purchasePrice,
-    price: product.price,
-    stock: product.stock,
-    mainImageUrl: product.mainImageUrl ?? product.imageUrl,
-    galleryImageUrls: product.galleryImageUrls,
-    description: product.description,
-  }));
+const directoryProducts = products.map((product) => ({
+  id: product.id,
+  productCode: product.productCode,
+  productName: product.productName,
+  source: product.source ?? "REGULAR",
+  categoryId: product.categoryId,
+  shopName: product.shop.shopName,
+  categoryName: product.category.name,
+  subcategoryId: product.subcategoryId,
+  subcategoryName: product.subcategory.name,
+  purchasePrice: product.purchasePrice,
+  price: product.price,
+  stock: product.stock,
+  mainImageUrl: product.mainImageUrl ?? product.imageUrl,
+  galleryImageUrls: product.galleryImageUrls,
+  description: product.description,
+  createdAt: product.createdAt, // add this
+}));
 
   return (
     <div className="space-y-5">
