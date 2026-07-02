@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 
 import { EmployeeBillingClient } from "@/features/products/components/EmployeeBillingClient";
 import { getCurrentUserId } from "@/lib/auth";
+import { activeProductWhere } from "@/lib/product-filters";
 import { prisma } from "@/lib/prisma";
 
 export default async function BillingPage() {
@@ -15,9 +16,7 @@ export default async function BillingPage() {
       },
     }),
     prisma.product.findMany({
-      where: {
-        deletedAt: null,
-      },
+      where: activeProductWhere,
       include: {
         shop: true,
         category: true,

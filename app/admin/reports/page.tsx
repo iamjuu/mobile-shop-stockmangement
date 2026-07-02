@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import { ReportsExportButton } from "@/features/reports/components/ReportsExportButton";
+import { activeProductWhere } from "@/lib/product-filters";
 import { prisma } from "@/lib/prisma";
 
 const numberFormatter = new Intl.NumberFormat("en-IN");
@@ -181,8 +182,8 @@ export default async function ReportsPage({
     }),
     prisma.product.findMany({
       where: {
+        ...activeProductWhere,
         ...createdAtFilter,
-        deletedAt: null,
       },
       include: {
         shop: true,
@@ -207,7 +208,6 @@ export default async function ReportsPage({
       include: {
         employee: true,
         shop: true,
-        product: true,
       },
       orderBy: {
         createdAt: "desc",
@@ -225,8 +225,8 @@ export default async function ReportsPage({
     }),
     prisma.product.aggregate({
       where: {
+        ...activeProductWhere,
         ...createdAtFilter,
-        deletedAt: null,
       },
       _sum: {
         stock: true,

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { activeProductWhere } from "@/lib/product-filters";
 
 import type {
   ProductFormValues,
@@ -12,9 +13,7 @@ type ProductCreateData =
 export class ProductRepository {
   async findAll() {
     return prisma.product.findMany({
-      where: {
-        deletedAt: null,
-      },
+      where: activeProductWhere,
       include: {
         shop: true,
         category: {
@@ -35,8 +34,8 @@ export class ProductRepository {
   ) {
     return prisma.product.findFirst({
       where: {
+        ...activeProductWhere,
         productCode,
-        deletedAt: null,
       },
     });
   }

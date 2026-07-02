@@ -1,3 +1,4 @@
+import { activeProductWhere } from "@/lib/product-filters";
 import { prisma } from "@/lib/prisma";
 
 export default async function ProductPage({
@@ -13,8 +14,8 @@ export default async function ProductPage({
   const product =
     await prisma.product.findFirst({
       where: {
+        ...activeProductWhere,
         productCode,
-        deletedAt: null,
       },
       include: {
         shop: true,

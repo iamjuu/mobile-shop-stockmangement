@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import { getCurrentUser } from "@/lib/current-user";
+import { activeProductWhere } from "@/lib/product-filters";
 import { prisma } from "@/lib/prisma";
 
 const currency = new Intl.NumberFormat("en-IN", {
@@ -45,9 +46,7 @@ export default async function EmployeeDashboard() {
       take: 5,
     }),
     prisma.product.count({
-      where: {
-        deletedAt: null,
-      },
+      where: activeProductWhere,
     }),
     prisma.shop.count(),
   ]);

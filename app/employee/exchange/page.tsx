@@ -7,6 +7,7 @@ import {
   deleteCloudinaryAssets,
   uploadImageFile,
 } from "@/lib/cloudinary";
+import { activeProductWhere } from "@/lib/product-filters";
 import { prisma } from "@/lib/prisma";
 
 const MAX_IMAGE_SIZE_BYTES = 2 * 1024 * 1024;
@@ -47,9 +48,7 @@ export default async function ExchangePage() {
       },
     }),
     prisma.product.findMany({
-      where: {
-        deletedAt: null,
-      },
+      where: activeProductWhere,
       include: {
         shop: true,
         category: true,

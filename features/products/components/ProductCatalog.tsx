@@ -70,6 +70,14 @@ const currency = new Intl.NumberFormat("en-IN", {
   style: "currency",
 });
 
+function getInitialCategoryId(categories: ProductCatalogCategory[]) {
+  return (
+    categories.find((category) => category.productCount > 0)?.id ??
+    categories[0]?.id ??
+    ""
+  );
+}
+
 export function ProductCatalog({
   categories,
   products,
@@ -95,7 +103,7 @@ export function ProductCatalog({
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState(
-    categories[0]?.id ?? ""
+    getInitialCategoryId(categories)
   );
   const editBrandOptions = useMemo(
     () =>

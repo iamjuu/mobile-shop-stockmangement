@@ -2,57 +2,62 @@ import { PackageSearch } from "lucide-react";
 import { revalidatePath } from "next/cache";
 
 import { ProductCatalog } from "@/features/products/components/ProductCatalog";
+import { archiveAndDeleteProduct } from "@/lib/product-archive";
+import { activeProductWhere } from "@/lib/product-filters";
 import { prisma } from "@/lib/prisma";
 
 export default async function ProductCatalogPage() {
   const [categories, products, subcategories] = await Promise.all([
-  prisma.category.findMany({
-    include: {
-      shop: true,
-      _count: {
-        select: {
-          products: true,
-        },
+    prisma.category.findMany({
+      include: {
+        shop: true,
       },
-    },
-    orderBy: {
-      name: "asc",
-    },
-  }),
+      orderBy: {
+        name: "asc",
+      },
+    }),
 
-prisma.product.findMany({
-  include: {
-    shop: true,
-    category: true,
-    subcategory: true,
-  },
-  orderBy: {
-    productName: "asc",
-  },
-}),
-prisma.subCategory.findMany({
-  orderBy: {
-    name: "asc",
-  },
-}),
-]);
+    prisma.product.findMany({
+      where: activeProductWhere,
+      include: {
+        shop: true,
+        category: true,
+        subcategory: true,
+      },
+      orderBy: {
+        productName: "asc",
+      },
+    }),
+    prisma.subCategory.findMany({
+      orderBy: {
+        name: "asc",
+      },
+    }),
+  ]);
 
-console.log("========== PRODUCTS ==========");
-console.log(products);
-console.log("Products Count:", products.length);
-
-products.forEach((product) => {
-  console.log({
-    id: product.id,
-    productName: product.productName,
-    productCode: product.productCode,
-    stock: product.stock,
-    deletedAt: product.deletedAt,
-  });
-});
-
-console.log("========== CATEGORIES ==========");
-console.log(categories);
+  console.log("========== ADMIN PRODUCT CATALOG ==========");
+  console.log("Categories:", categories.length);
+  console.log(
+    categories.map((category) => ({
+      id: category.id,
+      name: category.name,
+      shopName: category.shop?.shopName ?? "All shops",
+    }))
+  );
+  console.log("Products:", products.length);
+  console.log(
+    products.map((product) => ({
+      id: product.id,
+      productName: product.productName,
+      productCode: product.productCode,
+      categoryId: product.categoryId,
+      categoryName: product.category.name,
+      shopName: product.shop.shopName,
+      brandName: product.subcategory.name,
+      stock: product.stock,
+      deletedAt: product.deletedAt,
+    }))
+  );
 
   async function updateProduct(
     productId: string,
@@ -150,40 +155,10 @@ async function deleteProduct(productId: string) {
   }
 
   try {
-    const [saleCount, exchangeCount] = await Promise.all([
-      prisma.sale.count({
-        where: {
-          productId,
-        },
-      }),
-      prisma.exchange.count({
-        where: {
-          OR: [
-            { soldProductId: productId },
-            { receivedProductId: productId },
-          ],
-        },
-      }),
-    ]);
+    const result = await archiveAndDeleteProduct(productId);
 
-    if (saleCount > 0 || exchangeCount > 0) {
-      // Soft delete if the product has history
-      await prisma.product.update({
-        where: {
-          id: productId,
-        },
-        data: {
-          deletedAt: new Date(),
-          stock: 0,
-        },
-      });
-    } else {
-      // No history → permanently delete
-      await prisma.product.delete({
-        where: {
-          id: productId,
-        },
-      });
+    if (!result.ok) {
+      return result;
     }
 
     revalidatePath("/admin/product-catalog");
@@ -194,10 +169,7 @@ async function deleteProduct(productId: string) {
 
     return {
       ok: true,
-      message:
-        saleCount > 0 || exchangeCount > 0
-          ? "Product archived successfully."
-          : "Product deleted successfully.",
+      message: result.message,
     };
   } catch (error) {
     console.error(error);
@@ -226,11 +198,17 @@ async function deleteProduct(productId: string) {
       </section>
 
       <ProductCatalog
+        key={[
+          ...categories.map((category) => category.id),
+          ...products.map((product) => product.id),
+        ].join("|")}
         categories={categories.map((category) => ({
           id: category.id,
           name: category.name,
           shopName: category.shop?.shopName ?? "All shops",
-          productCount: category._count.products,
+          productCount: products.filter(
+            (product) => product.categoryId === category.id
+          ).length,
         }))}
         subcategories={subcategories.map((subcategory) => ({
           id: subcategory.id,

@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 
@@ -32,6 +33,7 @@ interface ProductCreateFormProps {
 }
 
 const ALL_SHOPS_VALUE = "all";
+const ALL_BRANDS_VALUE = "all";
 
 export function ProductCreateForm({
   shops,
@@ -41,7 +43,28 @@ export function ProductCreateForm({
 }: ProductCreateFormProps) {
   const [shopId, setShopId] = useState(ALL_SHOPS_VALUE);
   const [categoryId, setCategoryId] = useState("");
+  const [subcategoryId, setSubcategoryId] = useState("");
   const [galleryCount, setGalleryCount] = useState(0);
+  const [mainImagePreviewUrl, setMainImagePreviewUrl] = useState<string | null>(
+    null
+  );
+  const [galleryPreviewUrls, setGalleryPreviewUrls] = useState<string[]>([]);
+
+  useEffect(() => {
+    return () => {
+      if (mainImagePreviewUrl) {
+        URL.revokeObjectURL(mainImagePreviewUrl);
+      }
+    };
+  }, [mainImagePreviewUrl]);
+
+  useEffect(() => {
+    return () => {
+      galleryPreviewUrls.forEach((previewUrl) => {
+        URL.revokeObjectURL(previewUrl);
+      });
+    };
+  }, [galleryPreviewUrls]);
 
   const availableCategories = useMemo(
     () =>
@@ -62,8 +85,6 @@ export function ProductCreateForm({
   );
   const isMobileCategory =
     selectedCategory?.name.trim().toLowerCase() === "mobile";
-  const requiresSpecificShop =
-    isMobileCategory && shopId === ALL_SHOPS_VALUE;
 
   const availableSubcategories = useMemo(
     () =>
@@ -72,6 +93,15 @@ export function ProductCreateForm({
       ),
     [subcategories, selectedCategoryId]
   );
+  const selectedSubcategoryId =
+    subcategoryId === ALL_BRANDS_VALUE
+      ? ALL_BRANDS_VALUE
+      : subcategoryId &&
+          availableSubcategories.some(
+            (subcategory) => subcategory.id === subcategoryId
+          )
+        ? subcategoryId
+        : availableSubcategories[0]?.id ?? "";
 
   return (
     <form
@@ -108,8 +138,34 @@ export function ProductCreateForm({
           type="file"
           accept="image/*"
           required
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+
+            setMainImagePreviewUrl((currentPreviewUrl) => {
+              if (currentPreviewUrl) {
+                URL.revokeObjectURL(currentPreviewUrl);
+              }
+
+              return file ? URL.createObjectURL(file) : null;
+            });
+          }}
           className="w-full rounded-3xl border border-dashed border-zinc-300 bg-white px-4 py-4 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-zinc-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
         />
+        {mainImagePreviewUrl ? (
+          <div className="mt-3 flex items-center gap-3 rounded-2xl bg-zinc-50 p-2">
+            <Image
+              src={mainImagePreviewUrl}
+              alt="Main image preview"
+              width={64}
+              height={64}
+              unoptimized
+              className="h-16 w-16 rounded-xl object-cover"
+            />
+            <span className="text-xs font-medium text-zinc-600">
+              Main image preview
+            </span>
+          </div>
+        ) : null}
         <p className="mt-2 text-xs text-zinc-500">
           Required. This image appears in product lists and sale screens.
         </p>
@@ -135,13 +191,42 @@ export function ProductCreateForm({
               window.alert("You can upload a maximum of 3 optional images.");
               event.target.value = "";
               setGalleryCount(0);
+              setGalleryPreviewUrls((currentPreviewUrls) => {
+                currentPreviewUrls.forEach((previewUrl) => {
+                  URL.revokeObjectURL(previewUrl);
+                });
+
+                return [];
+              });
               return;
             }
 
             setGalleryCount(files.length);
+            setGalleryPreviewUrls((currentPreviewUrls) => {
+              currentPreviewUrls.forEach((previewUrl) => {
+                URL.revokeObjectURL(previewUrl);
+              });
+
+              return files.map((file) => URL.createObjectURL(file));
+            });
           }}
           className="w-full rounded-3xl border border-dashed border-zinc-300 bg-white px-4 py-4 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-zinc-100 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-zinc-700"
         />
+        {galleryPreviewUrls.length > 0 ? (
+          <div className="mt-3 flex flex-wrap gap-2 rounded-2xl bg-zinc-50 p-2">
+            {galleryPreviewUrls.map((previewUrl, index) => (
+              <Image
+                key={previewUrl}
+                src={previewUrl}
+                alt={`Other image preview ${index + 1}`}
+                width={56}
+                height={56}
+                unoptimized
+                className="h-14 w-14 rounded-xl object-cover"
+              />
+            ))}
+          </div>
+        ) : null}
         <p className="mt-2 text-xs text-zinc-500">
           Optional. Maximum 3 images selected: {galleryCount}
         </p>
@@ -162,6 +247,7 @@ export function ProductCreateForm({
           onChange={(event) => {
             setShopId(event.target.value);
             setCategoryId("");
+            setSubcategoryId("");
           }}
           className="w-full rounded-full border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-950"
         >
@@ -193,6 +279,7 @@ export function ProductCreateForm({
           value={selectedCategoryId}
           onChange={(event) => {
             setCategoryId(event.target.value);
+            setSubcategoryId("");
           }}
           className="w-full rounded-full border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-950"
         >
@@ -218,9 +305,16 @@ export function ProductCreateForm({
           id="subcategoryId"
           name="subcategoryId"
           required
+          value={selectedSubcategoryId}
+          onChange={(event) => {
+            setSubcategoryId(event.target.value);
+          }}
           disabled={availableSubcategories.length === 0}
           className="w-full rounded-full border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-950 disabled:cursor-not-allowed disabled:bg-zinc-100"
         >
+          <option value={ALL_BRANDS_VALUE}>
+            All brands
+          </option>
           {availableSubcategories.map((subcategory) => (
             <option
               key={subcategory.id}
@@ -329,8 +423,7 @@ export function ProductCreateForm({
         disabled={
           shops.length === 0 ||
           availableCategories.length === 0 ||
-          availableSubcategories.length === 0 ||
-          requiresSpecificShop
+          availableSubcategories.length === 0
         }
         pendingLabel="Creating product..."
         className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
@@ -349,11 +442,6 @@ export function ProductCreateForm({
       {availableCategories.length > 0 && availableSubcategories.length === 0 ? (
         <p className="text-sm text-red-600">
           Create a brand under the selected category.
-        </p>
-      ) : null}
-      {requiresSpecificShop ? (
-        <p className="text-sm text-red-600">
-          Select a specific shop for mobile products with an IMEI number.
         </p>
       ) : null}
     </form>

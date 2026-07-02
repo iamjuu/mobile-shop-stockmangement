@@ -1,6 +1,7 @@
 import { PackageSearch } from "lucide-react";
 
 import { ProductCatalog } from "@/features/products/components/ProductCatalog";
+import { activeProductWhere } from "@/lib/product-filters";
 import { prisma } from "@/lib/prisma";
 
 export default async function EmployeeProductCatalogPage() {
@@ -22,9 +23,7 @@ export default async function EmployeeProductCatalogPage() {
       },
     }),
     prisma.product.findMany({
-      where: {
-        deletedAt: null,
-      },
+      where: activeProductWhere,
       include: {
         shop: true,
         category: true,

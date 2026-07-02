@@ -13,9 +13,11 @@ import {
   deleteCloudinaryAssets,
   uploadImageFile,
 } from "@/lib/cloudinary";
+import { archiveAndDeleteProduct } from "@/lib/product-archive";
 import { prisma } from "@/lib/prisma";
 
 const MAX_IMAGE_SIZE_BYTES = 2 * 1024 * 1024;
+const ALL_BRANDS_VALUE = "all";
 
 function isUploadedFile(value: FormDataEntryValue | null): value is File {
   return value instanceof File && value.size > 0;
@@ -81,33 +83,43 @@ export default async function ProductsPage() {
 
     const [
       category,
-      subcategory,
     ] = await Promise.all([
       prisma.category.findUnique({
         where: {
           id: parsed.data.categoryId,
         },
       }),
-      prisma.subCategory.findUnique({
-        where: {
-          id: parsed.data.subcategoryId,
-        },
-      }),
     ]);
 
-    if (!category || !subcategory) {
+    if (!category) {
       return;
     }
 
-    if (subcategory.categoryId !== category.id) {
+    const targetSubcategories =
+      parsed.data.subcategoryId === ALL_BRANDS_VALUE
+        ? await prisma.subCategory.findMany({
+            where: {
+              categoryId: category.id,
+            },
+            select: {
+              id: true,
+            },
+          })
+        : await prisma.subCategory.findMany({
+            where: {
+              id: parsed.data.subcategoryId,
+              categoryId: category.id,
+            },
+            select: {
+              id: true,
+            },
+          });
+
+    if (targetSubcategories.length === 0) {
       return;
     }
 
     if (category.name.trim().toLowerCase() === "mobile" && !parsed.data.imeiNumber) {
-      return;
-    }
-
-    if (shopIdValue === "all" && category.name.trim().toLowerCase() === "mobile") {
       return;
     }
 
@@ -176,15 +188,18 @@ export default async function ProductsPage() {
         .map((image) => image.secureUrl);
 
       await Promise.all(
-        targetShops.map((targetShop) =>
-          service.create({
-            ...parsed.data,
-            shopId: targetShop.id,
-            imageUrl: mainImageUrl,
-            mainImageUrl,
-            galleryImageUrls,
-            imeiNumber: parsed.data.imeiNumber,
-          })
+        targetShops.flatMap((targetShop) =>
+          targetSubcategories.map((targetSubcategory) =>
+            service.create({
+              ...parsed.data,
+              shopId: targetShop.id,
+              subcategoryId: targetSubcategory.id,
+              imageUrl: mainImageUrl,
+              mainImageUrl,
+              galleryImageUrls,
+              imeiNumber: parsed.data.imeiNumber,
+            })
+          )
         )
       );
     } catch {
@@ -292,45 +307,10 @@ export default async function ProductsPage() {
       };
     }
 
-    const [
-      saleCount,
-      exchangeCount,
-    ] = await Promise.all([
-      prisma.sale.count({
-        where: {
-          productId,
-        },
-      }),
-      prisma.exchange.count({
-        where: {
-          OR: [
-            {
-              soldProductId: productId,
-            },
-            {
-              receivedProductId: productId,
-            },
-          ],
-        },
-      }),
-    ]);
+    const result = await archiveAndDeleteProduct(productId);
 
-    if (saleCount > 0 || exchangeCount > 0) {
-      await prisma.product.update({
-        where: {
-          id: productId,
-        },
-        data: {
-          deletedAt: new Date(),
-          stock: 0,
-        },
-      });
-    } else {
-      await prisma.product.delete({
-        where: {
-          id: productId,
-        },
-      });
+    if (!result.ok) {
+      return result;
     }
 
     revalidatePath("/admin/products");
@@ -341,7 +321,7 @@ export default async function ProductsPage() {
 
     return {
       ok: true,
-      message: "Product deleted successfully.",
+      message: result.message,
     };
   }
 

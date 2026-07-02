@@ -13,6 +13,7 @@ import {
   Users,
 } from "lucide-react";
 
+import { activeProductWhere } from "@/lib/product-filters";
 import { prisma } from "@/lib/prisma";
 
 const formatter = new Intl.NumberFormat("en-IN");
@@ -37,9 +38,7 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     prisma.shop.count(),
     prisma.product.count({
-      where: {
-        deletedAt: null,
-      },
+      where: activeProductWhere,
     }),
     prisma.user.count({
       where: {
@@ -49,16 +48,14 @@ export default async function DashboardPage() {
     prisma.category.count(),
     prisma.exchange.count(),
     prisma.product.aggregate({
-      where: {
-        deletedAt: null,
-      },
+      where: activeProductWhere,
       _sum: {
         stock: true,
       },
     }),
     prisma.product.findMany({
       where: {
-        deletedAt: null,
+        ...activeProductWhere,
         stock: {
           lte: 5,
         },
@@ -78,9 +75,7 @@ export default async function DashboardPage() {
       take: 6,
     }),
     prisma.product.findMany({
-      where: {
-        deletedAt: null,
-      },
+      where: activeProductWhere,
       include: {
         shop: true,
       },

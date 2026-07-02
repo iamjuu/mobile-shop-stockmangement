@@ -122,6 +122,46 @@ model Product {
   deletedAt DateTime?
 }
 
+model ProductHistory {
+  id                String @id @default(auto()) @map("_id") @db.ObjectId
+  originalProductId String @unique
+  productCode       String
+  productName       String
+
+  shopId        String
+  shopName      String
+  categoryId    String
+  categoryName  String
+  subcategoryId String
+  subcategoryName String
+
+  purchasePrice Float?
+  price         Float
+  stock         Int
+  source        ProductSource? @default(REGULAR)
+
+  imageUrl          String?
+  mainImageUrl      String?
+  galleryImageUrls  String[] @default([])
+  imeiNumber        String?
+  description       String?
+  qrCode            String?
+  barcode           String?
+
+  saleCount     Int @default(0)
+  exchangeCount Int @default(0)
+
+  productCreatedAt String
+  productUpdatedAt String
+  deletedAt        String
+  createdAt        String?
+
+  @@index([productCode])
+  @@index([shopId])
+  @@index([categoryId])
+  @@index([subcategoryId])
+}
+
 model Exchange {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
@@ -151,8 +191,8 @@ model Exchange {
 
   employee        User    @relation(fields: [employeeId], references: [id])
   shop            Shop    @relation(fields: [shopId], references: [id])
-  soldProduct     Product @relation("SoldProduct", fields: [soldProductId], references: [id])
-  receivedProduct Product @relation("ReceivedProduct", fields: [receivedProductId], references: [id])
+  soldProduct     Product? @relation("SoldProduct", fields: [soldProductId], references: [id])
+  receivedProduct Product? @relation("ReceivedProduct", fields: [receivedProductId], references: [id])
 
   createdAt DateTime @default(now())
 
@@ -218,7 +258,7 @@ model Sale {
   proofBackPublicId   String?
 
   employee User    @relation(fields: [employeeId], references: [id])
-  product  Product @relation(fields: [productId], references: [id])
+  product  Product? @relation(fields: [productId], references: [id])
   shop     Shop    @relation(fields: [shopId], references: [id])
 
   createdAt DateTime @default(now())
