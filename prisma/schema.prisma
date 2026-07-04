@@ -235,6 +235,23 @@ model Customer {
   @@index([phone])
 }
 
+model ServiceComplaint {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  customerName String
+  phone        String?
+  deviceName   String?
+  complaint    String
+  servicePrice Float
+  notes        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([phone])
+  @@index([createdAt])
+}
+
 model Sale {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 

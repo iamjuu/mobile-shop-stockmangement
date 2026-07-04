@@ -117,6 +117,7 @@ export default async function BillingPage() {
     productName: product.productName,
     shopId: product.shopId,
     shopName: product.shop.shopName,
+    categoryId: product.categoryId,
     categoryName: product.category.name,
     subcategoryName: product.subcategory.name,
     price: product.price,

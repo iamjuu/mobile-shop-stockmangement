@@ -18,6 +18,7 @@ interface BillingProduct {
   productName: string;
   shopId: string;
   shopName: string;
+  categoryId: string;
   categoryName: string;
   subcategoryName: string;
   price: number;
@@ -69,6 +70,7 @@ export function EmployeeBillingClient({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [selectedShopId, setSelectedShopId] = useState(shops[0]?.id ?? "");
+  const [selectedCategoryId, setSelectedCategoryId] = useState("all");
   const [qrProduct, setQrProduct] = useState<BillingProduct | null>(null);
   const [saleProduct, setSaleProduct] = useState<BillingProduct | null>(null);
   const [quantity, setQuantity] = useState(1);
@@ -77,10 +79,42 @@ export function EmployeeBillingClient({
   const [toast, setToast] = useState<string | null>(null);
   const saleLockedRef = useRef(false);
 
-  const visibleProducts = useMemo(
+  const shopProducts = useMemo(
     () => products.filter((product) => product.shopId === selectedShopId),
     [products, selectedShopId]
   );
+
+  const categoryOptions = useMemo(() => {
+    const categoryMap = new Map<string, string>();
+
+    for (const product of shopProducts) {
+      categoryMap.set(product.categoryId, product.categoryName);
+    }
+
+    return Array.from(categoryMap, ([id, name]) => ({
+      id,
+      name,
+    })).sort((first, second) => first.name.localeCompare(second.name));
+  }, [shopProducts]);
+
+  const visibleProducts = useMemo(
+    () =>
+      selectedCategoryId === "all"
+        ? shopProducts
+        : shopProducts.filter(
+            (product) => product.categoryId === selectedCategoryId
+          ),
+    [selectedCategoryId, shopProducts]
+  );
+
+  useEffect(() => {
+    if (
+      selectedCategoryId !== "all" &&
+      !categoryOptions.some((category) => category.id === selectedCategoryId)
+    ) {
+      setSelectedCategoryId("all");
+    }
+  }, [categoryOptions, selectedCategoryId]);
 
   const openSaleFromScan = useCallback((scannedValue: string) => {
     const productCode = getProductCodeFromScan(scannedValue).trim();
@@ -103,6 +137,7 @@ export function EmployeeBillingClient({
     }
 
     setSelectedShopId(product.shopId);
+    setSelectedCategoryId(product.categoryId);
     setQrProduct(null);
     setSaleProduct(product);
     setQuantity(1);
@@ -211,7 +246,7 @@ export function EmployeeBillingClient({
     <>
       <div className="space-y-4 sm:space-y-5">
         <section className="rounded-[24px] border border-zinc-200 bg-white p-4 sm:p-5">
-          <div className="grid gap-4 md:grid-cols-[1fr_360px] md:items-end">
+          <div className="grid gap-4 lg:grid-cols-[1fr_320px_320px] lg:items-end">
             <div>
               <p className="text-sm font-medium text-zinc-500">
                 Billing workflow
@@ -233,6 +268,7 @@ export function EmployeeBillingClient({
                 value={selectedShopId}
                 onChange={(event) => {
                   setSelectedShopId(event.target.value);
+                  setSelectedCategoryId("all");
                 }}
                 className="w-full rounded-full border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-950"
               >
@@ -242,6 +278,30 @@ export function EmployeeBillingClient({
                     value={shop.id}
                   >
                     {shop.shopName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="w-full">
+              <label
+                htmlFor="category"
+                className="mb-2 block text-sm font-medium text-zinc-700"
+              >
+                Category
+              </label>
+              <select
+                id="category"
+                value={selectedCategoryId}
+                onChange={(event) => {
+                  setSelectedCategoryId(event.target.value);
+                }}
+                className="w-full rounded-full border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-950"
+              >
+                <option value="all">All categories</option>
+                {categoryOptions.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
                   </option>
                 ))}
               </select>
@@ -256,7 +316,7 @@ export function EmployeeBillingClient({
                 Products for sale
               </h2>
               <p className="mt-1 text-sm text-zinc-500">
-                {visibleProducts.length} products in selected shop
+                {visibleProducts.length} of {shopProducts.length} products in selected shop
               </p>
             </div>
           </div>
@@ -324,7 +384,9 @@ export function EmployeeBillingClient({
               ))
             ) : (
               <div className="px-5 py-12 text-center text-sm text-zinc-500">
-                No products found for this shop.
+                {shopProducts.length > 0
+                  ? "No products found for this category."
+                  : "No products found for this shop."}
               </div>
             )}
           </div>
@@ -434,7 +496,9 @@ export function EmployeeBillingClient({
                       colSpan={6}
                       className="px-5 py-12 text-center text-sm text-zinc-500"
                     >
-                      No products found for this shop.
+                      {shopProducts.length > 0
+                        ? "No products found for this category."
+                        : "No products found for this shop."}
                     </td>
                   </tr>
                 )}

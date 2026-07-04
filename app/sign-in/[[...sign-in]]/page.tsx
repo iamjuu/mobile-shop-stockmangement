@@ -75,7 +75,7 @@ export default async function Page({ searchParams }: PageProps) {
               <p className="inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-zinc-200">
                 Secure workspace access
               </p>
-              <h2 className="mt-6 text-5xl font-semibold tracking-normal sm:text-6xl">
+              <h2 className="mt-6 text-3xl font-semibold tracking-normal sm:text-4xl">
                 Sign in and continue managing shop operations.
               </h2>
               <p className="mt-6 max-w-2xl text-base leading-7 text-zinc-300">

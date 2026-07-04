@@ -97,7 +97,7 @@ export default async function Page({ searchParams }: PageProps) {
                 <ShieldCheck className="h-4 w-4 text-[#ffdc5d]" />
                 Create a secure workspace
               </p>
-              <h2 className="mt-6 text-5xl font-semibold tracking-normal sm:text-6xl">
+              <h2 className="mt-6 text-3xl font-semibold tracking-normal sm:text-4xl">
                 Start managing inventory, shops, and daily sales.
               </h2>
               <p className="mt-6 max-w-2xl text-base leading-7 text-zinc-300">
@@ -206,7 +206,7 @@ export default async function Page({ searchParams }: PageProps) {
                   id="role"
                   name="role"
                   defaultValue="EMPLOYEE"
-                  className="w-full rounded-full border border-zinc-300 px-4 py-3 text-sm outline-none transition focus:border-zinc-950"
+                  className="w-full   rounded-full border border-zinc-300 px-4 py-3 text-sm outline-none transition focus:border-zinc-950"
                 >
                   <option value="EMPLOYEE">Employee</option>
                   <option value="ADMIN">Admin</option>

@@ -5,6 +5,7 @@ import {
   RefreshCcw,
   Users,
   PackageSearch,
+  Wrench,
 } from "lucide-react";
 
 export const employeeNavItems = [
@@ -37,6 +38,11 @@ export const employeeNavItems = [
     title: "Users",
     href: "/employee/users",
     icon: Users,
+  },
+  {
+    title: "Services",
+    href: "/employee/services",
+    icon: Wrench,
   },
   {
     title: "Sales History",

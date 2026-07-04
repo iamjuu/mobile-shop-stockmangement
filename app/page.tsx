@@ -53,7 +53,7 @@ export default function Home() {
                 Inventory and billing system
               </div>
 
-              <h2 className="max-w-4xl text-5xl font-semibold tracking-normal sm:text-6xl">
+              <h2 className="max-w-4xl text-3xl font-semibold tracking-normal sm:text-4xl">
                 Manage stock, shops, and sales from one clean dashboard.
               </h2>
 

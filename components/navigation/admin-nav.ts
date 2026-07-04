@@ -8,9 +8,17 @@ import {
   Users,
   BarChart3,
   RefreshCcw,
+  IndianRupee,
+  type LucideIcon,
 } from "lucide-react";
 
-export const adminNavItems = [
+type AdminNavItem = {
+  title: string;
+  href: string;
+  icon: LucideIcon;
+};
+
+export const adminNavItems: AdminNavItem[] = [
   {
     title: "Dashboard",
     href: "/admin/admin-dashboard",
@@ -55,6 +63,11 @@ export const adminNavItems = [
     title: "Employees",
     href: "/admin/employees",
     icon: Users,
+  },
+  {
+    title: "Profit",
+    href: "/admin/profit",
+    icon: IndianRupee,
   },
   {
     title: "Reports",
