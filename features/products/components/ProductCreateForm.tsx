@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 
 import { PendingSubmitButton } from "@/components/pending-submit-button";
@@ -29,11 +29,23 @@ interface ProductCreateFormProps {
   shops: ShopOption[];
   categories: CategoryOption[];
   subcategories: SubcategoryOption[];
-  action: (formData: FormData) => void;
+  action: (
+    state: ProductCreateState,
+    formData: FormData
+  ) => Promise<ProductCreateState>;
 }
 
 const ALL_SHOPS_VALUE = "all";
 const ALL_BRANDS_VALUE = "all";
+const initialCreateState: ProductCreateState = {
+  ok: false,
+  message: "",
+};
+
+export interface ProductCreateState {
+  ok: boolean;
+  message: string;
+}
 
 export function ProductCreateForm({
   shops,
@@ -41,14 +53,26 @@ export function ProductCreateForm({
   subcategories,
   action,
 }: ProductCreateFormProps) {
+  const [state, formAction] = useActionState(action, initialCreateState);
+  const formRef = useRef<HTMLFormElement>(null);
+  const toastTimerRef = useRef<number | null>(null);
   const [shopId, setShopId] = useState(ALL_SHOPS_VALUE);
   const [categoryId, setCategoryId] = useState("");
   const [subcategoryId, setSubcategoryId] = useState("");
   const [galleryCount, setGalleryCount] = useState(0);
+  const [toast, setToast] = useState<string | null>(null);
   const [mainImagePreviewUrl, setMainImagePreviewUrl] = useState<string | null>(
     null
   );
   const [galleryPreviewUrls, setGalleryPreviewUrls] = useState<string[]>([]);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -65,6 +89,57 @@ export function ProductCreateForm({
       });
     };
   }, [galleryPreviewUrls]);
+
+  useEffect(() => {
+    if (!state.message) {
+      return;
+    }
+
+    const effectTimer = window.setTimeout(() => {
+      setToast(state.message);
+
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+
+      toastTimerRef.current = window.setTimeout(() => {
+        setToast(null);
+      }, 2500);
+
+      if (!state.ok) {
+        return;
+      }
+
+      formRef.current?.reset();
+      setShopId(ALL_SHOPS_VALUE);
+      setCategoryId("");
+      setSubcategoryId("");
+      setGalleryCount(0);
+      setMainImagePreviewUrl(null);
+      setGalleryPreviewUrls([]);
+
+      const productDirectory = document.getElementById("product-directory");
+
+      productDirectory?.focus({
+        preventScroll: true,
+      });
+      productDirectory?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+        inline: "nearest",
+      });
+
+      document.getElementById("product-directory-scroll")?.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: "smooth",
+      });
+    }, 0);
+
+    return () => {
+      window.clearTimeout(effectTimer);
+    };
+  }, [state]);
 
   const availableCategories = useMemo(
     () =>
@@ -104,8 +179,10 @@ export function ProductCreateForm({
         : availableSubcategories[0]?.id ?? "";
 
   return (
+    <>
     <form
-      action={action}
+      ref={formRef}
+      action={formAction}
       className="mt-6 space-y-4"
     >
       <div>
@@ -445,5 +522,12 @@ export function ProductCreateForm({
         </p>
       ) : null}
     </form>
+
+    {toast ? (
+      <div className="fixed right-5 top-5 z-[60] rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white shadow-xl">
+        {toast}
+      </div>
+    ) : null}
+    </>
   );
 }

@@ -379,76 +379,6 @@ export function EmployeeExchangeClient({
             </p>
           </div>
 
-          <div>
-            <div>
-              <label
-                htmlFor="receivedProductName"
-                className="mb-2 block text-sm font-medium text-zinc-700"
-              >
-                Phone name/model
-              </label>
-              <input
-                id="receivedProductName"
-                name="receivedProductName"
-                required
-                placeholder="Example: iPhone 12 128GB"
-                className="w-full rounded-full border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-950"
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-3">
-            <div>
-              <label
-                htmlFor="receivedImage"
-                className="mb-2 block text-sm font-medium text-zinc-700"
-              >
-                Device image 1
-              </label>
-              <input
-                id="receivedImage"
-                name="receivedImage"
-                type="file"
-                accept="image/*"
-                required
-                className="w-full rounded-3xl border border-dashed border-zinc-300 bg-white px-4 py-4 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-zinc-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="deviceImageOne"
-                className="mb-2 block text-sm font-medium text-zinc-700"
-              >
-                Device image 2
-              </label>
-              <input
-                id="deviceImageOne"
-                name="deviceImageOne"
-                type="file"
-                accept="image/*"
-                required
-                className="w-full rounded-3xl border border-dashed border-zinc-300 bg-white px-4 py-4 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-zinc-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="deviceImageTwo"
-                className="mb-2 block text-sm font-medium text-zinc-700"
-              >
-                Device image 3 optional
-              </label>
-              <input
-                id="deviceImageTwo"
-                name="deviceImageTwo"
-                type="file"
-                accept="image/*"
-                className="w-full rounded-3xl border border-dashed border-zinc-300 bg-white px-4 py-4 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-zinc-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
-              />
-            </div>
-          </div>
-
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <div className="mb-2 flex items-center justify-between gap-3">
@@ -559,6 +489,96 @@ export function EmployeeExchangeClient({
             </div>
           </div>
 
+          {isMobileCategory ? (
+            <div>
+              <label
+                htmlFor="imeiNumber"
+                className="mb-2 block text-sm font-medium text-zinc-700"
+              >
+                IMEI number
+              </label>
+              <input
+                id="imeiNumber"
+                name="imeiNumber"
+                value={imeiNumber}
+                onChange={(event) => {
+                  setImeiNumber(event.target.value);
+                }}
+                required
+                placeholder="Enter IMEI number"
+                className="w-full rounded-full border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-950"
+              />
+            </div>
+          ) : null}
+
+          <div>
+            <label
+              htmlFor="receivedProductName"
+              className="mb-2 block text-sm font-medium text-zinc-700"
+            >
+              Product name/model
+            </label>
+            <input
+              id="receivedProductName"
+              name="receivedProductName"
+              required
+              placeholder="Example: iPhone 12 128GB, Apple Watch Series 8"
+              className="w-full rounded-full border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-950"
+            />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <div>
+              <label
+                htmlFor="receivedImage"
+                className="mb-2 block text-sm font-medium text-zinc-700"
+              >
+                Device image 1
+              </label>
+              <input
+                id="receivedImage"
+                name="receivedImage"
+                type="file"
+                accept="image/*"
+                required
+                className="w-full rounded-3xl border border-dashed border-zinc-300 bg-white px-4 py-4 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-zinc-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="deviceImageOne"
+                className="mb-2 block text-sm font-medium text-zinc-700"
+              >
+                Device image 2
+              </label>
+              <input
+                id="deviceImageOne"
+                name="deviceImageOne"
+                type="file"
+                accept="image/*"
+                required
+                className="w-full rounded-3xl border border-dashed border-zinc-300 bg-white px-4 py-4 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-zinc-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="deviceImageTwo"
+                className="mb-2 block text-sm font-medium text-zinc-700"
+              >
+                Device image 3 optional
+              </label>
+              <input
+                id="deviceImageTwo"
+                name="deviceImageTwo"
+                type="file"
+                accept="image/*"
+                className="w-full rounded-3xl border border-dashed border-zinc-300 bg-white px-4 py-4 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-zinc-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+              />
+            </div>
+          </div>
+
           <div className="grid gap-4 md:grid-cols-3">
             <div>
               <label
@@ -615,30 +635,6 @@ export function EmployeeExchangeClient({
               />
             </div>
           </div>
-
-          {isMobileCategory ? (
-            <div>
-              <div>
-                <label
-                  htmlFor="imeiNumber"
-                  className="mb-2 block text-sm font-medium text-zinc-700"
-                >
-                  IMEI number
-                </label>
-                <input
-                  id="imeiNumber"
-                  name="imeiNumber"
-                  value={imeiNumber}
-                  onChange={(event) => {
-                    setImeiNumber(event.target.value);
-                  }}
-                  required
-                  placeholder="Enter IMEI number"
-                  className="w-full rounded-full border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-950"
-                />
-              </div>
-            </div>
-          ) : null}
 
           <div>
             <p className="mb-2 text-sm font-medium text-zinc-700">

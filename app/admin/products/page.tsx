@@ -2,7 +2,10 @@ import { Package } from "lucide-react";
 import { revalidatePath } from "next/cache";
 
 import { CategoryService } from "@/features/categories/services/category.service";
-import { ProductCreateForm } from "@/features/products/components/ProductCreateForm";
+import {
+  ProductCreateForm,
+  type ProductCreateState,
+} from "@/features/products/components/ProductCreateForm";
 import { ProductDirectory } from "@/features/products/components/ProductDirectory";
 import { productSchema } from "@/features/products/schemas/product.schema";
 import { ProductService } from "@/features/products/services/product.service";
@@ -45,7 +48,10 @@ export default async function ProductsPage() {
     productService.getAll(),
   ]);
 
-  async function createProduct(formData: FormData) {
+  async function createProduct(
+    _state: ProductCreateState,
+    formData: FormData
+  ): Promise<ProductCreateState> {
     "use server";
 
     const shopIdValue = String(formData.get("shopId") ?? "");
@@ -62,7 +68,10 @@ export default async function ProductsPage() {
     });
 
     if (!parsed.success) {
-      return;
+      return {
+        ok: false,
+        message: "Invalid product details.",
+      };
     }
 
     const mainImage = formData.get("mainImage");
@@ -71,14 +80,20 @@ export default async function ProductsPage() {
       .filter(isUploadedFile);
 
     if (!isUploadedFile(mainImage) || !isValidImage(mainImage)) {
-      return;
+      return {
+        ok: false,
+        message: "Upload a valid main image under 2 MB.",
+      };
     }
 
     if (
       galleryImages.length > 3 ||
       galleryImages.some((file) => !isValidImage(file))
     ) {
-      return;
+      return {
+        ok: false,
+        message: "Optional images must be images under 2 MB, maximum 3.",
+      };
     }
 
     const [
@@ -92,7 +107,10 @@ export default async function ProductsPage() {
     ]);
 
     if (!category) {
-      return;
+      return {
+        ok: false,
+        message: "Invalid category.",
+      };
     }
 
     const targetSubcategories =
@@ -116,11 +134,17 @@ export default async function ProductsPage() {
           });
 
     if (targetSubcategories.length === 0) {
-      return;
+      return {
+        ok: false,
+        message: "Invalid brand for this category.",
+      };
     }
 
     if (category.name.trim().toLowerCase() === "mobile" && !parsed.data.imeiNumber) {
-      return;
+      return {
+        ok: false,
+        message: "IMEI number is required for mobile products.",
+      };
     }
 
     const allShops = await prisma.shop.findMany({
@@ -136,7 +160,10 @@ export default async function ProductsPage() {
         : [shopIdValue];
 
     if (targetShopIds.length === 0) {
-      return;
+      return {
+        ok: false,
+        message: "Create a shop before adding products.",
+      };
     }
 
     const targetShops = await prisma.shop.findMany({
@@ -151,12 +178,18 @@ export default async function ProductsPage() {
     });
 
     if (targetShops.length !== targetShopIds.length) {
-      return;
+      return {
+        ok: false,
+        message: "Invalid shop.",
+      };
     }
 
     for (const targetShop of targetShops) {
       if (category.shopId && category.shopId !== targetShop.id) {
-        return;
+        return {
+          ok: false,
+          message: "This category is not available for the selected shop.",
+        };
       }
     }
 
@@ -207,11 +240,19 @@ export default async function ProductsPage() {
         uploadedImages.map((image) => image.publicId)
       );
 
-      return;
+      return {
+        ok: false,
+        message: "Product could not be created. Try again.",
+      };
     }
 
     revalidatePath("/admin/products");
     revalidatePath("/admin/admin-dashboard");
+
+    return {
+      ok: true,
+      message: "Product created successfully.",
+    };
   }
 
   async function updateProduct(

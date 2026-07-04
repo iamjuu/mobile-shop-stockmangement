@@ -18,6 +18,12 @@ import { TablePagination } from "@/components/table-pagination";
 
 import { QRPreview } from "./QRPreview";
 
+type ProductShopSummary = {
+  shopName: string;
+  stock: number;
+  recordCount: number;
+};
+
 interface ProductDirectoryItem {
   id: string;
   productCode: string;
@@ -35,10 +41,12 @@ interface ProductDirectoryItem {
   galleryImageUrls?: string[];
   description?: string | null;
   createdAt: string | Date; // add this
+  shopSummaries?: ProductShopSummary[];
 }
 
 type ProductDirectoryRow = ProductDirectoryItem & {
   recordCount: number;
+  shopSummaries: ProductShopSummary[];
 };
 
 interface ProductDirectoryProps {
@@ -88,6 +96,36 @@ function escapeHtml(value: string) {
     .replaceAll("'", "&#039;");
 }
 
+function mergeShopSummary(
+  shopSummaries: ProductDirectoryRow["shopSummaries"],
+  product: ProductDirectoryItem,
+) {
+  const summary = shopSummaries.find(
+    (shopSummary) => shopSummary.shopName === product.shopName,
+  );
+
+  if (summary) {
+    return shopSummaries.map((shopSummary) =>
+      shopSummary.shopName === product.shopName
+        ? {
+            ...shopSummary,
+            stock: shopSummary.stock + product.stock,
+            recordCount: shopSummary.recordCount + 1,
+          }
+        : shopSummary,
+    );
+  }
+
+  return [
+    ...shopSummaries,
+    {
+      shopName: product.shopName,
+      stock: product.stock,
+      recordCount: 1,
+    },
+  ];
+}
+
 export function ProductDirectory({
   products,
   subcategories = [],
@@ -99,7 +137,13 @@ export function ProductDirectory({
   const [localProducts, setLocalProducts] = useState(products);
 
   useEffect(() => {
-    setLocalProducts(products);
+    const syncTimer = window.setTimeout(() => {
+      setLocalProducts(products);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(syncTimer);
+    };
   }, [products]);
 
   const [selectedProduct, setSelectedProduct] =
@@ -129,6 +173,11 @@ export function ProductDirectory({
         : [],
     [editProduct, subcategories],
   );
+  const selectedProductShopLabel = selectedProduct?.shopSummaries?.length
+    ? selectedProduct.shopSummaries.length === 1
+      ? selectedProduct.shopSummaries[0].shopName
+      : `${selectedProduct.shopSummaries.length} shops`
+    : selectedProduct?.shopName ?? "";
 
   const qrValue = useMemo(() => {
     if (!selectedProduct) {
@@ -138,7 +187,7 @@ export function ProductDirectory({
     return JSON.stringify({
       code: selectedProduct.productCode,
       name: selectedProduct.productName,
-      shop: selectedProduct.shopName,
+      shop: selectedProductShopLabel,
       category: selectedProduct.categoryName,
       subcategory: selectedProduct.subcategoryName,
       purchasePrice: selectedProduct.purchasePrice ?? 0,
@@ -147,7 +196,7 @@ export function ProductDirectory({
         selectedProduct.price - (selectedProduct.purchasePrice ?? 0),
       stock: selectedProduct.stock,
     });
-  }, [selectedProduct]);
+  }, [selectedProduct, selectedProductShopLabel]);
   const visibleProducts = useMemo(() => {
     const filteredProducts = localProducts.filter(
       (product) =>
@@ -164,7 +213,6 @@ export function ProductDirectory({
           : [
               source,
               product.productName.trim().toLowerCase(),
-              product.shopName,
               product.categoryName,
               product.subcategoryName,
               product.purchasePrice ?? 0,
@@ -178,6 +226,13 @@ export function ProductDirectory({
         groupedProducts.set(groupKey, {
           ...product,
           recordCount: 1,
+          shopSummaries: [
+            {
+              shopName: product.shopName,
+              stock: product.stock,
+              recordCount: 1,
+            },
+          ],
         });
         return;
       }
@@ -186,10 +241,16 @@ export function ProductDirectory({
       const currentTime = new Date(product.createdAt).getTime();
       const shouldUseThisProduct = currentTime > existingTime;
 
+      const shopSummaries = mergeShopSummary(
+        existingProduct.shopSummaries,
+        product,
+      ).sort((a, b) => b.stock - a.stock);
+
       groupedProducts.set(groupKey, {
         ...(shouldUseThisProduct ? product : existingProduct),
         stock: existingProduct.stock + product.stock,
         recordCount: existingProduct.recordCount + 1,
+        shopSummaries,
       });
     });
 
@@ -264,7 +325,7 @@ export function ProductDirectory({
 
     const productName = escapeHtml(selectedProduct.productName);
     const productCode = escapeHtml(selectedProduct.productCode);
-    const shopName = escapeHtml(selectedProduct.shopName);
+    const shopName = escapeHtml(selectedProductShopLabel);
     const categoryName = escapeHtml(selectedProduct.categoryName);
     const subcategoryName = escapeHtml(selectedProduct.subcategoryName);
     const purchasePrice = escapeHtml(
@@ -465,12 +526,16 @@ export function ProductDirectory({
 
   return (
     <>
-      <section className="overflow-hidden rounded-[24px] border border-zinc-200 bg-white">
+      <section
+        id="product-directory"
+        tabIndex={-1}
+        className="scroll-mt-5 overflow-hidden rounded-[24px] border border-zinc-200 bg-white outline-none"
+      >
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 px-5 py-4">
           <div>
             <h2 className="text-lg font-semibold">Product directory</h2>
             <p className="mt-1 text-sm text-zinc-500">
-              {visibleProducts.length} products shown
+              {visibleProducts.length} product groups shown
             </p>
           </div>
           <div className="flex rounded-full bg-zinc-100 p-1">
@@ -500,7 +565,10 @@ export function ProductDirectory({
           </div>
         </div>
 
-        <div className="scrollbar-hover overflow-x-auto">
+        <div
+          id="product-directory-scroll"
+          className="scrollbar-hover overflow-x-auto"
+        >
           <table className="w-full min-w-[1100px] border-collapse text-left">
             <thead className="bg-zinc-50 text-xs font-semibold uppercase tracking-wide text-zinc-500">
               <tr>
@@ -573,7 +641,41 @@ export function ProductDirectory({
                       </div>
                     </td>
                     <td className="px-5 py-4 text-zinc-700">
-                      {product.shopName}
+                      <div className="max-w-[210px] space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium text-zinc-950">
+                            {product.shopSummaries.length === 1
+                              ? product.shopSummaries[0].shopName
+                              : `${product.shopSummaries.length} shops`}
+                          </span>
+                          {product.shopSummaries.length > 1 ? (
+                            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-zinc-600">
+                              {product.recordCount} records
+                            </span>
+                          ) : null}
+                        </div>
+
+                        {product.shopSummaries.length > 1 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {product.shopSummaries.slice(0, 3).map((shop) => (
+                              <span
+                                key={shop.shopName}
+                                className="inline-flex items-center gap-1 rounded-full bg-zinc-50 px-2 py-1 text-[11px] font-medium text-zinc-600"
+                              >
+                                {shop.shopName}
+                                <span className="font-semibold text-zinc-950">
+                                  {shop.stock}
+                                </span>
+                              </span>
+                            ))}
+                            {product.shopSummaries.length > 3 ? (
+                              <span className="inline-flex items-center rounded-full bg-zinc-50 px-2 py-1 text-[11px] font-semibold text-zinc-500">
+                                +{product.shopSummaries.length - 3}
+                              </span>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="px-5 py-4">
                       <span className="inline-flex rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700">
@@ -788,7 +890,7 @@ export function ProductDirectory({
                       ? "Exchange Third Party"
                       : "Regular",
                   ],
-                  ["Shop", selectedProduct.shopName],
+                  ["Shop", selectedProductShopLabel],
                   ["Category", selectedProduct.categoryName],
                   ["Brand", selectedProduct.subcategoryName],
                   [
@@ -1002,7 +1104,7 @@ export function ProductDirectory({
       ) : null}
 
       {toast ? (
-        <div className="fixed bottom-5 right-5 z-[60] rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white shadow-xl">
+        <div className="fixed right-5 top-5 z-[60] rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white shadow-xl">
           {toast}
         </div>
       ) : null}
