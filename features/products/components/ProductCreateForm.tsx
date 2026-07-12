@@ -35,8 +35,7 @@ interface ProductCreateFormProps {
   ) => Promise<ProductCreateState>;
 }
 
-const ALL_SHOPS_VALUE = "all";
-const ALL_BRANDS_VALUE = "all";
+const NO_SHOP_VALUE = "";
 const initialCreateState: ProductCreateState = {
   ok: false,
   message: "",
@@ -56,7 +55,7 @@ export function ProductCreateForm({
   const [state, formAction] = useActionState(action, initialCreateState);
   const formRef = useRef<HTMLFormElement>(null);
   const toastTimerRef = useRef<number | null>(null);
-  const [shopId, setShopId] = useState(ALL_SHOPS_VALUE);
+  const [shopId, setShopId] = useState(NO_SHOP_VALUE);
   const [categoryId, setCategoryId] = useState("");
   const [subcategoryId, setSubcategoryId] = useState("");
   const [galleryCount, setGalleryCount] = useState(0);
@@ -96,6 +95,10 @@ export function ProductCreateForm({
     }
 
     const effectTimer = window.setTimeout(() => {
+      if (!state.ok) {
+        return;
+      }
+
       setToast(state.message);
 
       if (toastTimerRef.current) {
@@ -106,12 +109,8 @@ export function ProductCreateForm({
         setToast(null);
       }, 2500);
 
-      if (!state.ok) {
-        return;
-      }
-
       formRef.current?.reset();
-      setShopId(ALL_SHOPS_VALUE);
+      setShopId(NO_SHOP_VALUE);
       setCategoryId("");
       setSubcategoryId("");
       setGalleryCount(0);
@@ -143,18 +142,18 @@ export function ProductCreateForm({
 
   const availableCategories = useMemo(
     () =>
-      shopId === ALL_SHOPS_VALUE
-        ? categories
-        : categories.filter(
+      shopId
+        ? categories.filter(
             (category) => !category.shopId || category.shopId === shopId
-          ),
+          )
+        : [],
     [categories, shopId]
   );
 
   const selectedCategoryId =
     categoryId && availableCategories.some((category) => category.id === categoryId)
       ? categoryId
-      : availableCategories[0]?.id ?? "";
+      : "";
   const selectedCategory = availableCategories.find(
     (category) => category.id === selectedCategoryId
   );
@@ -169,14 +168,12 @@ export function ProductCreateForm({
     [subcategories, selectedCategoryId]
   );
   const selectedSubcategoryId =
-    subcategoryId === ALL_BRANDS_VALUE
-      ? ALL_BRANDS_VALUE
-      : subcategoryId &&
-          availableSubcategories.some(
-            (subcategory) => subcategory.id === subcategoryId
-          )
-        ? subcategoryId
-        : availableSubcategories[0]?.id ?? "";
+    subcategoryId &&
+    availableSubcategories.some(
+      (subcategory) => subcategory.id === subcategoryId
+    )
+      ? subcategoryId
+      : "";
 
   return (
     <>
@@ -328,9 +325,7 @@ export function ProductCreateForm({
           }}
           className="w-full rounded-full border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-950"
         >
-          <option value={ALL_SHOPS_VALUE}>
-            All shops
-          </option>
+          <option value="">Choose shop</option>
           {shops.map((shop) => (
             <option
               key={shop.id}
@@ -358,8 +353,10 @@ export function ProductCreateForm({
             setCategoryId(event.target.value);
             setSubcategoryId("");
           }}
+          disabled={!shopId || availableCategories.length === 0}
           className="w-full rounded-full border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-950"
         >
+          <option value="">Choose category</option>
           {availableCategories.map((category) => (
             <option
               key={category.id}
@@ -386,12 +383,10 @@ export function ProductCreateForm({
           onChange={(event) => {
             setSubcategoryId(event.target.value);
           }}
-          disabled={availableSubcategories.length === 0}
+          disabled={!selectedCategoryId || availableSubcategories.length === 0}
           className="w-full rounded-full border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-950 disabled:cursor-not-allowed disabled:bg-zinc-100"
         >
-          <option value={ALL_BRANDS_VALUE}>
-            All brands
-          </option>
+          <option value="">Choose brand</option>
           {availableSubcategories.map((subcategory) => (
             <option
               key={subcategory.id}
@@ -499,6 +494,9 @@ export function ProductCreateForm({
       <PendingSubmitButton
         disabled={
           shops.length === 0 ||
+          !shopId ||
+          !selectedCategoryId ||
+          !selectedSubcategoryId ||
           availableCategories.length === 0 ||
           availableSubcategories.length === 0
         }
@@ -508,12 +506,18 @@ export function ProductCreateForm({
         Create Product
       </PendingSubmitButton>
 
+      {state.message && !state.ok ? (
+        <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          {state.message}
+        </p>
+      ) : null}
+
       {shops.length === 0 ? (
         <p className="text-sm text-red-600">Create a shop before adding products.</p>
       ) : null}
       {shops.length > 0 && availableCategories.length === 0 ? (
         <p className="text-sm text-red-600">
-          Create a category for this shop or choose All shops.
+          Choose a shop with categories or create a category for this shop.
         </p>
       ) : null}
       {availableCategories.length > 0 && availableSubcategories.length === 0 ? (

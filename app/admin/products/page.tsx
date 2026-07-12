@@ -9,7 +9,6 @@ import {
 import { ProductDirectory } from "@/features/products/components/ProductDirectory";
 import { productSchema } from "@/features/products/schemas/product.schema";
 import { ProductService } from "@/features/products/services/product.service";
-import { generateProductCode } from "@/features/products/utils/product-code";
 import { ShopService } from "@/features/shops/services/shop.service";
 import { SubCategoryService } from "@/features/subcategories/services/subcategory.service";
 import {
@@ -17,10 +16,10 @@ import {
   uploadImageFile,
 } from "@/lib/cloudinary";
 import { archiveAndDeleteProduct } from "@/lib/product-archive";
+import { activeProductWhere } from "@/lib/product-filters";
 import { prisma } from "@/lib/prisma";
 
 const MAX_IMAGE_SIZE_BYTES = 2 * 1024 * 1024;
-const ALL_BRANDS_VALUE = "all";
 
 function isUploadedFile(value: FormDataEntryValue | null): value is File {
   return value instanceof File && value.size > 0;
@@ -28,6 +27,51 @@ function isUploadedFile(value: FormDataEntryValue | null): value is File {
 
 function isValidImage(file: File) {
   return file.type.startsWith("image/") && file.size <= MAX_IMAGE_SIZE_BYTES;
+}
+
+function normalizeProductName(productName: string) {
+  return productName.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+async function findDuplicateRegularProduct(data: {
+  productName: string;
+  shopId: string;
+  categoryId: string;
+  subcategoryId: string;
+  purchasePrice?: number | null;
+  price: number;
+  excludeProductId?: string;
+}) {
+  const matchingProducts = await prisma.product.findMany({
+    where: {
+      ...activeProductWhere,
+      source: "REGULAR",
+      shopId: data.shopId,
+      categoryId: data.categoryId,
+      subcategoryId: data.subcategoryId,
+      purchasePrice: data.purchasePrice ?? null,
+      price: data.price,
+      ...(data.excludeProductId
+        ? {
+            NOT: {
+              id: data.excludeProductId,
+            },
+          }
+        : {}),
+    },
+    select: {
+      id: true,
+      productName: true,
+      productCode: true,
+    },
+  });
+  const normalizedProductName = normalizeProductName(data.productName);
+
+  return (
+    matchingProducts.find(
+      (product) => normalizeProductName(product.productName) === normalizedProductName,
+    ) ?? null
+  );
 }
 
 export default async function ProductsPage() {
@@ -55,9 +99,17 @@ export default async function ProductsPage() {
     "use server";
 
     const shopIdValue = String(formData.get("shopId") ?? "");
+
+    if (!shopIdValue || shopIdValue === "all") {
+      return {
+        ok: false,
+        message: "Choose a shop before adding products.",
+      };
+    }
+
     const parsed = productSchema.safeParse({
       productName: formData.get("productName"),
-      shopId: shopIdValue === "all" ? shops[0]?.id ?? "" : shopIdValue,
+      shopId: shopIdValue,
       categoryId: formData.get("categoryId"),
       subcategoryId: formData.get("subcategoryId"),
       purchasePrice: formData.get("purchasePrice"),
@@ -113,27 +165,17 @@ export default async function ProductsPage() {
       };
     }
 
-    const targetSubcategories =
-      parsed.data.subcategoryId === ALL_BRANDS_VALUE
-        ? await prisma.subCategory.findMany({
-            where: {
-              categoryId: category.id,
-            },
-            select: {
-              id: true,
-            },
-          })
-        : await prisma.subCategory.findMany({
-            where: {
-              id: parsed.data.subcategoryId,
-              categoryId: category.id,
-            },
-            select: {
-              id: true,
-            },
-          });
+    const targetSubcategory = await prisma.subCategory.findFirst({
+      where: {
+        id: parsed.data.subcategoryId,
+        categoryId: category.id,
+      },
+      select: {
+        id: true,
+      },
+    });
 
-    if (targetSubcategories.length === 0) {
+    if (!targetSubcategory) {
       return {
         ok: false,
         message: "Invalid brand for this category.",
@@ -147,50 +189,43 @@ export default async function ProductsPage() {
       };
     }
 
-    const allShops = await prisma.shop.findMany({
-      select: {
-        id: true,
-      },
-    });
-    const targetShopIds =
-      shopIdValue === "all"
-        ? category.shopId
-          ? [category.shopId]
-          : allShops.map((shop) => shop.id)
-        : [shopIdValue];
-
-    if (targetShopIds.length === 0) {
-      return {
-        ok: false,
-        message: "Create a shop before adding products.",
-      };
-    }
-
-    const targetShops = await prisma.shop.findMany({
+    const targetShop = await prisma.shop.findFirst({
       where: {
-        id: {
-          in: targetShopIds,
-        },
+        id: parsed.data.shopId,
       },
       select: {
         id: true,
       },
     });
 
-    if (targetShops.length !== targetShopIds.length) {
+    if (!targetShop) {
       return {
         ok: false,
         message: "Invalid shop.",
       };
     }
 
-    for (const targetShop of targetShops) {
-      if (category.shopId && category.shopId !== targetShop.id) {
-        return {
-          ok: false,
-          message: "This category is not available for the selected shop.",
-        };
-      }
+    if (category.shopId && category.shopId !== targetShop.id) {
+      return {
+        ok: false,
+        message: "This category is not available for the selected shop.",
+      };
+    }
+
+    const duplicateProduct = await findDuplicateRegularProduct({
+      productName: parsed.data.productName,
+      shopId: targetShop.id,
+      categoryId: category.id,
+      subcategoryId: targetSubcategory.id,
+      purchasePrice: parsed.data.purchasePrice,
+      price: parsed.data.price,
+    });
+
+    if (duplicateProduct) {
+      return {
+        ok: false,
+        message: `This product already exists (${duplicateProduct.productCode}). Use Add Product to increase stock.`,
+      };
     }
 
     const service = new ProductService();
@@ -220,21 +255,16 @@ export default async function ProductsPage() {
         .slice(1)
         .map((image) => image.secureUrl);
 
-      await Promise.all(
-        targetShops.flatMap((targetShop) =>
-          targetSubcategories.map((targetSubcategory) =>
-            service.create({
-              ...parsed.data,
-              shopId: targetShop.id,
-              subcategoryId: targetSubcategory.id,
-              imageUrl: mainImageUrl,
-              mainImageUrl,
-              galleryImageUrls,
-              imeiNumber: parsed.data.imeiNumber,
-            })
-          )
-        )
-      );
+      await service.create({
+        ...parsed.data,
+        productName: parsed.data.productName.trim().replace(/\s+/g, " "),
+        shopId: targetShop.id,
+        subcategoryId: targetSubcategory.id,
+        imageUrl: mainImageUrl,
+        mainImageUrl,
+        galleryImageUrls,
+        imeiNumber: parsed.data.imeiNumber,
+      });
     } catch {
       await deleteCloudinaryAssets(
         uploadedImages.map((image) => image.publicId)
@@ -290,6 +320,7 @@ export default async function ProductsPage() {
           id: productId,
         },
         select: {
+          shopId: true,
           categoryId: true,
         },
       }),
@@ -311,6 +342,23 @@ export default async function ProductsPage() {
       return {
         ok: false,
         message: "Invalid brand for this product category.",
+      };
+    }
+
+    const duplicateProduct = await findDuplicateRegularProduct({
+      productName,
+      shopId: product.shopId,
+      categoryId: product.categoryId,
+      subcategoryId: data.subcategoryId,
+      purchasePrice: data.purchasePrice,
+      price: data.price,
+      excludeProductId: productId,
+    });
+
+    if (duplicateProduct) {
+      return {
+        ok: false,
+        message: `Another product already has these details (${duplicateProduct.productCode}).`,
       };
     }
 
@@ -376,8 +424,9 @@ export default async function ProductsPage() {
       };
     }
 
-    const product = await prisma.product.findUnique({
+    const product = await prisma.product.findFirst({
       where: {
+        ...activeProductWhere,
         id: productId,
       },
       include: {
@@ -394,24 +443,21 @@ export default async function ProductsPage() {
       };
     }
 
-    const newProduct = await prisma.product.create({
+    if ((product.source ?? "REGULAR") !== "REGULAR") {
+      return {
+        ok: false,
+        message: "Only regular products can be added this way.",
+      };
+    }
+
+    const updatedProduct = await prisma.product.update({
+      where: {
+        id: product.id,
+      },
       data: {
-        productCode: generateProductCode(),
-        productName: product.productName,
-        shopId: product.shopId,
-        categoryId: product.categoryId,
-        subcategoryId: product.subcategoryId,
-        purchasePrice: product.purchasePrice,
-        price: product.price,
-        stock: 1,
-        source: product.source ?? "REGULAR",
-        imageUrl: product.imageUrl,
-        mainImageUrl: product.mainImageUrl,
-        galleryImageUrls: product.galleryImageUrls,
-        imeiNumber: product.imeiNumber,
-        description: product.description,
-        qrCode: product.qrCode,
-        barcode: product.barcode,
+        stock: {
+          increment: 1,
+        },
       },
       include: {
         shop: true,
@@ -427,24 +473,24 @@ export default async function ProductsPage() {
 
     return {
       ok: true,
-      message: "Product added successfully.",
+      message: "Product stock increased successfully.",
       product: {
-        id: newProduct.id,
-        productCode: newProduct.productCode,
-        productName: newProduct.productName,
-        source: newProduct.source ?? "REGULAR",
-        categoryId: newProduct.categoryId,
-        shopName: newProduct.shop.shopName,
-        categoryName: newProduct.category.name,
-        subcategoryId: newProduct.subcategoryId,
-        subcategoryName: newProduct.subcategory.name,
-        purchasePrice: newProduct.purchasePrice,
-        price: newProduct.price,
-        stock: newProduct.stock,
-        mainImageUrl: newProduct.mainImageUrl ?? newProduct.imageUrl,
-        galleryImageUrls: newProduct.galleryImageUrls,
-        description: newProduct.description,
-          createdAt: newProduct.createdAt, // add this
+        id: updatedProduct.id,
+        productCode: updatedProduct.productCode,
+        productName: updatedProduct.productName,
+        source: updatedProduct.source ?? "REGULAR",
+        categoryId: updatedProduct.categoryId,
+        shopName: updatedProduct.shop.shopName,
+        categoryName: updatedProduct.category.name,
+        subcategoryId: updatedProduct.subcategoryId,
+        subcategoryName: updatedProduct.subcategory.name,
+        purchasePrice: updatedProduct.purchasePrice,
+        price: updatedProduct.price,
+        stock: updatedProduct.stock,
+        mainImageUrl: updatedProduct.mainImageUrl ?? updatedProduct.imageUrl,
+        galleryImageUrls: updatedProduct.galleryImageUrls,
+        description: updatedProduct.description,
+        createdAt: updatedProduct.createdAt,
 
       },
     };

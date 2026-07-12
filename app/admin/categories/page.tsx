@@ -1,12 +1,18 @@
 import { Tags } from "lucide-react";
 import { revalidatePath } from "next/cache";
 
-import { PendingSubmitButton } from "@/components/pending-submit-button";
-import { createCategoryAction } from "@/features/categories/actions/create-category";
+import {
+  CategoryCreateForm,
+  type CategoryCreateState,
+} from "@/features/categories/components/CategoryCreateForm";
 import { CategoryDirectory } from "@/features/categories/components/CategoryDirectory";
 import { CategoryService } from "@/features/categories/services/category.service";
 import { ShopService } from "@/features/shops/services/shop.service";
 import { prisma } from "@/lib/prisma";
+
+function normalizeCategoryName(name: string) {
+  return name.trim().replace(/\s+/g, " ").toLowerCase();
+}
 
 export default async function CategoriesPage() {
   const categoryService = new CategoryService();
@@ -19,21 +25,101 @@ export default async function CategoriesPage() {
     shopService.getAll(),
   ]);
 
-  async function createCategory(formData: FormData) {
+  async function createCategory(
+    _state: CategoryCreateState,
+    formData: FormData
+  ): Promise<CategoryCreateState> {
     "use server";
 
-    const name = String(formData.get("name") ?? "").trim();
-    const shopIdValue = String(formData.get("shopId") ?? "");
-    const shopId = shopIdValue === "all" ? null : shopIdValue;
+    const name = String(formData.get("name") ?? "")
+      .trim()
+      .replace(/\s+/g, " ");
+    const shopScope = String(formData.get("shopScope") ?? "all");
+    const selectedShopIds = Array.from(
+      new Set(
+        formData
+          .getAll("shopIds")
+          .map((shopId) => String(shopId))
+          .filter(Boolean)
+      )
+    );
 
-    if (!name) {
-      return;
+    if (name.length < 2) {
+      return {
+        ok: false,
+        message: "Enter a category name with at least 2 characters.",
+      };
     }
 
-    await createCategoryAction(
-      name,
-      shopId
+    const targetShopIds =
+      shopScope === "all" ? [null] : selectedShopIds;
+
+    if (targetShopIds.length === 0) {
+      return {
+        ok: false,
+        message: "Select All shops or at least one shop.",
+      };
+    }
+
+    if (shopScope !== "all") {
+      const validShopCount = await prisma.shop.count({
+        where: {
+          id: {
+            in: selectedShopIds,
+          },
+        },
+      });
+
+      if (validShopCount !== selectedShopIds.length) {
+        return {
+          ok: false,
+          message: "One or more selected shops are invalid.",
+        };
+      }
+    }
+
+    const existingCategories = await prisma.category.findMany({
+      where: {
+        OR: targetShopIds.map((shopId) => ({
+          shopId,
+        })),
+      },
+      include: {
+        shop: true,
+      },
+    });
+    const normalizedName = normalizeCategoryName(name);
+    const duplicateCategory = existingCategories.find(
+      (category) => normalizeCategoryName(category.name) === normalizedName
     );
+
+    if (duplicateCategory) {
+      return {
+        ok: false,
+        message: `Category already exists for ${
+          duplicateCategory.shop?.shopName ?? "All shops"
+        }.`,
+      };
+    }
+
+    await prisma.category.createMany({
+      data: targetShopIds.map((shopId) => ({
+        name,
+        shopId,
+      })),
+    });
+
+    revalidatePath("/admin/categories");
+    revalidatePath("/admin/products");
+    revalidatePath("/employee/billing");
+
+    return {
+      ok: true,
+      message:
+        targetShopIds.length === 1
+          ? "Category created successfully."
+          : `${targetShopIds.length} categories created successfully.`,
+    };
   }
 
   async function updateCategory(
@@ -115,61 +201,10 @@ export default async function CategoriesPage() {
             select one shop for a branch-specific category.
           </p>
 
-          <form
+          <CategoryCreateForm
+            shops={directoryShops}
             action={createCategory}
-            className="mt-6 space-y-4"
-          >
-            <div>
-              <label
-                htmlFor="name"
-                className="mb-2 block text-sm font-medium text-zinc-700"
-              >
-                Category name
-              </label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                required
-                placeholder="Example: Electronics"
-                className="w-full rounded-full border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-950"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="shopId"
-                className="mb-2 block text-sm font-medium text-zinc-700"
-              >
-                Shop
-              </label>
-              <select
-                id="shopId"
-                name="shopId"
-                defaultValue="all"
-                className="w-full rounded-full border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-950"
-              >
-                <option value="all">
-                  All shops
-                </option>
-                {shops.map((shop) => (
-                  <option
-                    key={shop.id}
-                    value={shop.id}
-                  >
-                    {shop.shopName}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <PendingSubmitButton
-              pendingLabel="Creating category..."
-              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
-            >
-              Create Category
-            </PendingSubmitButton>
-          </form>
+          />
         </section>
 
         <CategoryDirectory

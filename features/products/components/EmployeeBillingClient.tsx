@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, Loader2, QrCode, X } from "lucide-react";
+import { Check, Download, Loader2, QrCode, ReceiptText, X } from "lucide-react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -27,10 +27,34 @@ interface BillingProduct {
   description?: string | null;
 }
 
+interface SaleBill {
+  invoiceNo: string;
+  date: string;
+  employeeName: string;
+  employeeEmail: string;
+  shopName: string;
+  shopCode: string;
+  shopAddress?: string | null;
+  shopPhone?: string | null;
+  productCode: string;
+  productName: string;
+  categoryName: string;
+  subcategoryName: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+  discount: number;
+  totalAmount: number;
+  proofNumber?: string | null;
+}
+
 interface EmployeeBillingClientProps {
   shops: ShopOption[];
   products: BillingProduct[];
-  saleAction: (formData: FormData) => Promise<{ success: boolean }>;
+  saleAction: (formData: FormData) => Promise<{
+    success: boolean;
+    bill?: SaleBill;
+  }>;
 }
 
 const currency = new Intl.NumberFormat("en-IN", {
@@ -62,6 +86,138 @@ function createQrValue(product: BillingProduct) {
   });
 }
 
+function escapeHtml(value: string | number | null | undefined) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function formatBillDate(value: string) {
+  return new Date(value).toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function createBillHtml(bill: SaleBill) {
+  const invoiceNo = escapeHtml(bill.invoiceNo);
+  const rows = [
+    ["Product", bill.productName],
+    ["Product code", bill.productCode],
+    ["Category", bill.categoryName],
+    ["Brand", bill.subcategoryName],
+    ["Quantity", bill.quantity],
+    ["Unit price", currency.format(bill.unitPrice)],
+    ["Subtotal", currency.format(bill.subtotal)],
+    ["Discount", currency.format(bill.discount)],
+    ["Total amount", currency.format(bill.totalAmount)],
+    ["Proof number", bill.proofNumber || "Not provided"],
+  ];
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bill ${invoiceNo}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f4f4f5; color: #18181b; font-family: Arial, sans-serif; }
+    .page { max-width: 760px; margin: 24px auto; background: #fff; padding: 32px; border: 1px solid #e4e4e7; }
+    .top { display: flex; justify-content: space-between; gap: 24px; border-bottom: 2px solid #18181b; padding-bottom: 20px; }
+    h1 { margin: 0; font-size: 26px; letter-spacing: 0; }
+    h2 { margin: 28px 0 12px; font-size: 15px; text-transform: uppercase; color: #52525b; }
+    p { margin: 5px 0; font-size: 13px; color: #52525b; }
+    .right { text-align: right; }
+    .badge { display: inline-block; margin-top: 8px; border-radius: 999px; background: #dcfce7; color: #166534; padding: 6px 12px; font-size: 12px; font-weight: 700; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 14px; }
+    th, td { border-bottom: 1px solid #e4e4e7; padding: 12px 8px; text-align: left; }
+    th { color: #71717a; font-size: 12px; text-transform: uppercase; }
+    td:last-child, th:last-child { text-align: right; font-weight: 700; }
+    .total { margin-top: 18px; margin-left: auto; width: 320px; }
+    .total div { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid #e4e4e7; font-size: 14px; }
+    .total .payable { font-size: 18px; font-weight: 800; border-bottom: 0; }
+    .footer { margin-top: 36px; display: flex; justify-content: space-between; gap: 20px; color: #71717a; font-size: 12px; }
+    @media print {
+      body { background: #fff; }
+      .page { margin: 0; max-width: none; border: 0; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="top">
+      <div>
+        <h1>${escapeHtml(bill.shopName)}</h1>
+        <p>Shop code: ${escapeHtml(bill.shopCode)}</p>
+        ${bill.shopAddress ? `<p>${escapeHtml(bill.shopAddress)}</p>` : ""}
+        ${bill.shopPhone ? `<p>Phone: ${escapeHtml(bill.shopPhone)}</p>` : ""}
+      </div>
+      <div class="right">
+        <h1>Bill</h1>
+        <p>Invoice: ${invoiceNo}</p>
+        <p>Date: ${escapeHtml(formatBillDate(bill.date))}</p>
+        <span class="badge">Product sold</span>
+      </div>
+    </section>
+
+    <h2>Employee Details</h2>
+    <p>Name: ${escapeHtml(bill.employeeName)}</p>
+    <p>Email: ${escapeHtml(bill.employeeEmail)}</p>
+
+    <h2>Product Details</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows
+          .map(
+            ([label, value]) => `<tr><td>${escapeHtml(label)}</td><td>${escapeHtml(value)}</td></tr>`
+          )
+          .join("")}
+      </tbody>
+    </table>
+
+    <div class="total">
+      <div><span>Subtotal</span><strong>${escapeHtml(currency.format(bill.subtotal))}</strong></div>
+      <div><span>Discount</span><strong>${escapeHtml(currency.format(bill.discount))}</strong></div>
+      <div class="payable"><span>Net Amount</span><strong>${escapeHtml(currency.format(bill.totalAmount))}</strong></div>
+    </div>
+
+    <section class="footer">
+      <span>Thank you for your business.</span>
+      <span>${escapeHtml(bill.shopName)}</span>
+    </section>
+  </main>
+</body>
+</html>`;
+}
+
+function downloadBill(bill: SaleBill) {
+  const blob = new Blob([createBillHtml(bill)], {
+    type: "text/html;charset=utf-8",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = `bill-${bill.invoiceNo}.html`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function EmployeeBillingClient({
   shops,
   products,
@@ -77,6 +233,7 @@ export function EmployeeBillingClient({
   const [discount, setDiscount] = useState(0);
   const [isSelling, setIsSelling] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [latestBill, setLatestBill] = useState<SaleBill | null>(null);
   const saleLockedRef = useRef(false);
 
   const shopProducts = useMemo(
@@ -106,15 +263,6 @@ export function EmployeeBillingClient({
           ),
     [selectedCategoryId, shopProducts]
   );
-
-  useEffect(() => {
-    if (
-      selectedCategoryId !== "all" &&
-      !categoryOptions.some((category) => category.id === selectedCategoryId)
-    ) {
-      setSelectedCategoryId("all");
-    }
-  }, [categoryOptions, selectedCategoryId]);
 
   const openSaleFromScan = useCallback((scannedValue: string) => {
     const productCode = getProductCodeFromScan(scannedValue).trim();
@@ -217,8 +365,11 @@ export function EmployeeBillingClient({
       setSaleProduct(null);
       setQuantity(1);
       setDiscount(0);
+      if (result.bill) {
+        setLatestBill(result.bill);
+      }
       setToast(
-        `Sold ${soldProduct.productName} - ${currency.format(
+        `Product sold: ${soldProduct.productName} - ${currency.format(
           soldProduct.price * soldQuantity - saleDiscount
         )}`
       );
@@ -592,7 +743,7 @@ export function EmployeeBillingClient({
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-medium text-zinc-500">
-                  Confirm sale
+                  Process sale
                 </p>
                 <h3 className="mt-1 text-2xl font-semibold">
                   {saleProduct.productName}
@@ -731,17 +882,77 @@ export function EmployeeBillingClient({
                 {isSelling ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Confirming...
+                    Processing...
                   </>
                 ) : (
                   <>
                     <Check className="h-4 w-4" />
-                    Confirm
+                    Process
                   </>
                 )}
               </button>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {latestBill ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[28px] bg-white p-5 shadow-2xl">
+            <div className="flex items-start gap-4">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
+                <ReceiptText className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-zinc-500">
+                  Product sold
+                </p>
+                <h3 className="mt-1 text-xl font-semibold">
+                  Do you want to download the bill?
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-zinc-500">
+                  Invoice {latestBill.invoiceNo} for {latestBill.productName}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-2xl bg-zinc-50 px-4 py-3 text-sm">
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-zinc-500">Quantity</span>
+                <span className="font-semibold">{latestBill.quantity}</span>
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-4">
+                <span className="text-zinc-500">Net Amount</span>
+                <span className="font-semibold">
+                  {currency.format(latestBill.totalAmount)}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-zinc-300 px-5 py-3 text-sm font-semibold text-zinc-700 hover:bg-zinc-100"
+                onClick={() => {
+                  setLatestBill(null);
+                }}
+              >
+                <X className="h-4 w-4" />
+                No
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800"
+                onClick={() => {
+                  downloadBill(latestBill);
+                  setLatestBill(null);
+                }}
+              >
+                <Download className="h-4 w-4" />
+                Download
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

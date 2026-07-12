@@ -215,10 +215,7 @@ export function ProductDirectory({
               product.productName.trim().toLowerCase(),
               product.categoryName,
               product.subcategoryName,
-              product.purchasePrice ?? 0,
               product.price,
-              product.mainImageUrl ?? "",
-              product.description ?? "",
             ].join("|");
       const existingProduct = groupedProducts.get(groupKey);
 
@@ -462,10 +459,13 @@ export function ProductDirectory({
       showToast(result.message);
 
       if (result.ok && result.product) {
-        setLocalProducts((currentProducts) => [
-          result.product as ProductDirectoryItem,
-          ...currentProducts,
-        ]);
+        setLocalProducts((currentProducts) =>
+          currentProducts.map((currentProduct) =>
+            currentProduct.id === result.product?.id
+              ? (result.product as ProductDirectoryItem)
+              : currentProduct,
+          ),
+        );
         setSourceFilter("REGULAR");
         setSelectedProduct(result.product);
         router.refresh();
@@ -641,40 +641,44 @@ export function ProductDirectory({
                       </div>
                     </td>
                     <td className="px-5 py-4 text-zinc-700">
-                      <div className="max-w-[210px] space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
+                      <div className="relative inline-flex">
+                        {product.shopSummaries.length === 1 ? (
                           <span className="font-medium text-zinc-950">
-                            {product.shopSummaries.length === 1
-                              ? product.shopSummaries[0].shopName
-                              : `${product.shopSummaries.length} shops`}
+                            {product.shopSummaries[0].shopName}
                           </span>
-                          {product.shopSummaries.length > 1 ? (
-                            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-zinc-600">
-                              {product.recordCount} records
+                        ) : (
+                          <div className="group relative">
+                            <span
+                              className="inline-flex cursor-default rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700"
+                              title={product.shopSummaries
+                                .map((shop) => `${shop.shopName}: ${shop.stock}`)
+                                .join("\n")}
+                            >
+                              {product.shopSummaries.length - 1}+
                             </span>
-                          ) : null}
-                        </div>
 
-                        {product.shopSummaries.length > 1 ? (
-                          <div className="flex flex-wrap gap-1.5">
-                            {product.shopSummaries.slice(0, 3).map((shop) => (
-                              <span
-                                key={shop.shopName}
-                                className="inline-flex items-center gap-1 rounded-full bg-zinc-50 px-2 py-1 text-[11px] font-medium text-zinc-600"
-                              >
-                                {shop.shopName}
-                                <span className="font-semibold text-zinc-950">
-                                  {shop.stock}
-                                </span>
-                              </span>
-                            ))}
-                            {product.shopSummaries.length > 3 ? (
-                              <span className="inline-flex items-center rounded-full bg-zinc-50 px-2 py-1 text-[11px] font-semibold text-zinc-500">
-                                +{product.shopSummaries.length - 3}
-                              </span>
-                            ) : null}
+                            <div className="pointer-events-none absolute left-0 top-full z-20 mt-2 w-48 rounded-md border border-zinc-200 bg-white p-2 text-xs text-zinc-700 opacity-0 shadow-lg transition group-hover:opacity-100">
+                              <p className="mb-1 font-semibold text-zinc-950">
+                                {product.shopSummaries.length} shops
+                              </p>
+                              <div className="space-y-1">
+                                {product.shopSummaries.map((shop) => (
+                                  <div
+                                    key={shop.shopName}
+                                    className="flex items-center justify-between gap-3"
+                                  >
+                                    <span className="truncate">
+                                      {shop.shopName}
+                                    </span>
+                                    <span className="shrink-0 font-semibold text-zinc-950">
+                                      {shop.stock}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
                           </div>
-                        ) : null}
+                        )}
                       </div>
                     </td>
                     <td className="px-5 py-4">

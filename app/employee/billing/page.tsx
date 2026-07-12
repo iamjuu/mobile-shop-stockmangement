@@ -37,17 +37,27 @@ export default async function BillingPage() {
     const discount = Math.max(0, Number(formData.get("discount") ?? 0) || 0);
     const proofNumber = String(formData.get("proofNumber") ?? "").trim();
 
-    const product = await prisma.product.findUnique({
-      where: {
-        id: productId,
-      },
-      include: {
-        shop: true,
-      },
-    });
+    const [employee, product] = await Promise.all([
+      prisma.user.findUnique({
+        where: {
+          id: employeeId,
+        },
+      }),
+      prisma.product.findUnique({
+        where: {
+          id: productId,
+        },
+        include: {
+          shop: true,
+          category: true,
+          subcategory: true,
+        },
+      }),
+    ]);
     const subtotal = product ? product.price * quantity : 0;
 
     if (
+      !employee ||
       !product ||
       quantity < 1 ||
       product.stock < quantity ||
@@ -63,7 +73,7 @@ export default async function BillingPage() {
     const profit = (product.price - purchasePrice) * quantity - discount;
 
     try {
-      await prisma.$transaction([
+      const [, sale] = await prisma.$transaction([
         prisma.product.update({
           where: {
             id: product.id,
@@ -91,20 +101,40 @@ export default async function BillingPage() {
           },
         }),
       ]);
+
+      revalidatePath("/employee/billing");
+      revalidatePath("/employee/dashboard");
+      revalidatePath("/employee/sales-history");
+      revalidatePath("/admin/admin-dashboard");
+
+      return {
+        success: true,
+        bill: {
+          invoiceNo: sale.id,
+          date: sale.createdAt.toISOString(),
+          employeeName: employee.name,
+          employeeEmail: employee.email,
+          shopName: product.shop.shopName,
+          shopCode: product.shop.shopCode,
+          shopAddress: product.shop.address,
+          shopPhone: product.shop.phone,
+          productCode: product.productCode,
+          productName: product.productName,
+          categoryName: product.category.name,
+          subcategoryName: product.subcategory.name,
+          quantity,
+          unitPrice: product.price,
+          subtotal,
+          discount,
+          totalAmount,
+          proofNumber: proofNumber || null,
+        },
+      };
     } catch {
       return {
         success: false,
       };
     }
-
-    revalidatePath("/employee/billing");
-    revalidatePath("/employee/dashboard");
-    revalidatePath("/employee/sales-history");
-    revalidatePath("/admin/admin-dashboard");
-
-    return {
-      success: true,
-    };
   }
 
   const billingShops = shops.map((shop) => ({

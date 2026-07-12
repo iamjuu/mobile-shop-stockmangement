@@ -40,6 +40,17 @@ interface ProductCatalogItem {
   description?: string | null;
 }
 
+type ProductShopSummary = {
+  shopName: string;
+  stock: number;
+  recordCount: number;
+};
+
+type ProductCatalogRow = ProductCatalogItem & {
+  recordCount: number;
+  shopSummaries: ProductShopSummary[];
+};
+
 interface ProductCatalogProps {
   categories: ProductCatalogCategory[];
   products: ProductCatalogItem[];
@@ -78,6 +89,85 @@ function getInitialCategoryId(categories: ProductCatalogCategory[]) {
   );
 }
 
+function getProductGroupKey(product: ProductCatalogItem) {
+  return [
+    product.source,
+    product.productName.trim().toLowerCase(),
+    product.categoryName,
+    product.brandName,
+    product.price,
+  ].join("|");
+}
+
+function mergeShopSummary(
+  shopSummaries: ProductCatalogRow["shopSummaries"],
+  product: ProductCatalogItem
+) {
+  const summary = shopSummaries.find(
+    (shopSummary) => shopSummary.shopName === product.shopName
+  );
+
+  if (summary) {
+    return shopSummaries.map((shopSummary) =>
+      shopSummary.shopName === product.shopName
+        ? {
+            ...shopSummary,
+            stock: shopSummary.stock + product.stock,
+            recordCount: shopSummary.recordCount + 1,
+          }
+        : shopSummary
+    );
+  }
+
+  return [
+    ...shopSummaries,
+    {
+      shopName: product.shopName,
+      stock: product.stock,
+      recordCount: 1,
+    },
+  ];
+}
+
+function groupProducts(products: ProductCatalogItem[]) {
+  const groupedProducts = new Map<string, ProductCatalogRow>();
+
+  products.forEach((product) => {
+    const groupKey =
+      product.source === "EXCHANGE_THIRD_PARTY"
+        ? product.id
+        : getProductGroupKey(product);
+    const existingProduct = groupedProducts.get(groupKey);
+
+    if (!existingProduct) {
+      groupedProducts.set(groupKey, {
+        ...product,
+        recordCount: 1,
+        shopSummaries: [
+          {
+            shopName: product.shopName,
+            stock: product.stock,
+            recordCount: 1,
+          },
+        ],
+      });
+      return;
+    }
+
+    groupedProducts.set(groupKey, {
+      ...existingProduct,
+      stock: existingProduct.stock + product.stock,
+      recordCount: existingProduct.recordCount + 1,
+      shopSummaries: mergeShopSummary(
+        existingProduct.shopSummaries,
+        product
+      ).sort((a, b) => b.stock - a.stock),
+    });
+  });
+
+  return Array.from(groupedProducts.values());
+}
+
 export function ProductCatalog({
   categories,
   products,
@@ -94,7 +184,7 @@ export function ProductCatalog({
   const [productQuery, setProductQuery] = useState("");
   const [brandFilter, setBrandFilter] = useState("ALL");
   const [selectedProduct, setSelectedProduct] =
-    useState<ProductCatalogItem | null>(null);
+    useState<ProductCatalogRow | null>(null);
   const [editProduct, setEditProduct] =
     useState<ProductCatalogItem | null>(null);
   const [deleteProduct, setDeleteProduct] =
@@ -117,12 +207,17 @@ export function ProductCatalog({
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, number>();
 
-    localProducts.forEach((product) => {
-      counts.set(product.categoryId, (counts.get(product.categoryId) ?? 0) + 1);
+    categories.forEach((category) => {
+      counts.set(
+        category.id,
+        groupProducts(
+          localProducts.filter((product) => product.categoryId === category.id)
+        ).length
+      );
     });
 
     return counts;
-  }, [localProducts]);
+  }, [categories, localProducts]);
   const selectedCategory =
     categories.find((category) => category.id === selectedCategoryId) ?? null;
   const isMobileCategory =
@@ -160,34 +255,44 @@ export function ProductCatalog({
       ).sort((first, second) => first.localeCompare(second)),
     [localProducts, selectedCategoryId]
   );
-  const selectedProducts = useMemo(
-    () => {
-      const normalizedQuery = productQuery.trim().toLowerCase();
+  const selectedProducts = useMemo(() => {
+    const normalizedQuery = productQuery.trim().toLowerCase();
 
-      return localProducts.filter((product) => {
-        const matchesCategory = product.categoryId === selectedCategoryId;
-        const matchesBrand =
-          !isMobileCategory ||
-          brandFilter === "ALL" ||
-          product.brandName === brandFilter;
-        const matchesQuery =
-          !normalizedQuery ||
-          [
-            product.productName,
-            product.productCode,
-            product.categoryName,
-            product.brandName,
-            product.imeiNumber ?? "",
-          ]
-            .join(" ")
-            .toLowerCase()
-            .includes(normalizedQuery);
+    const filteredProducts = localProducts.filter((product) => {
+      const matchesCategory = product.categoryId === selectedCategoryId;
+      const matchesBrand =
+        !isMobileCategory ||
+        brandFilter === "ALL" ||
+        product.brandName === brandFilter;
+      const matchesQuery =
+        !normalizedQuery ||
+        [
+          product.productName,
+          product.productCode,
+          product.categoryName,
+          product.brandName,
+          product.imeiNumber ?? "",
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(normalizedQuery);
 
-        return matchesCategory && matchesBrand && matchesQuery;
-      });
-    },
-    [brandFilter, isMobileCategory, localProducts, productQuery, selectedCategoryId]
-  );
+      return matchesCategory && matchesBrand && matchesQuery;
+    });
+
+    return groupProducts(filteredProducts);
+  }, [
+    brandFilter,
+    isMobileCategory,
+    localProducts,
+    productQuery,
+    selectedCategoryId,
+  ]);
+  const selectedProductShopLabel = selectedProduct?.shopSummaries.length
+    ? selectedProduct.shopSummaries.length === 1
+      ? selectedProduct.shopSummaries[0].shopName
+      : `${selectedProduct.shopSummaries.length - 1}+`
+    : selectedProduct?.shopName ?? "";
   const qrValue = useMemo(() => {
     if (!selectedProduct) {
       return "";
@@ -196,7 +301,7 @@ export function ProductCatalog({
     return JSON.stringify({
       code: selectedProduct.productCode,
       name: selectedProduct.productName,
-      shop: selectedProduct.shopName,
+      shop: selectedProductShopLabel,
       category: selectedProduct.categoryName,
       subcategory: selectedProduct.brandName,
       purchasePrice: selectedProduct.purchasePrice ?? 0,
@@ -205,7 +310,7 @@ export function ProductCatalog({
         selectedProduct.price - (selectedProduct.purchasePrice ?? 0),
       stock: selectedProduct.stock,
     });
-  }, [selectedProduct]);
+  }, [selectedProduct, selectedProductShopLabel]);
 
   function showToast(message: string) {
     setToast(message);
@@ -480,7 +585,43 @@ export function ProductCatalog({
                       </div>
                     </td>
                     <td className="px-5 py-4 text-zinc-700">
-                      {product.shopName}
+                      <div className="relative inline-flex">
+                        {product.shopSummaries.length === 1 ? (
+                          <span>{product.shopSummaries[0].shopName}</span>
+                        ) : (
+                          <div className="group relative">
+                            <span
+                              className="inline-flex cursor-default rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700"
+                              title={product.shopSummaries
+                                .map((shop) => `${shop.shopName}: ${shop.stock}`)
+                                .join("\n")}
+                            >
+                              {product.shopSummaries.length - 1}+
+                            </span>
+
+                            <div className="pointer-events-none absolute left-0 top-full z-20 mt-2 w-48 rounded-md border border-zinc-200 bg-white p-2 text-xs text-zinc-700 opacity-0 shadow-lg transition group-hover:opacity-100">
+                              <p className="mb-1 font-semibold text-zinc-950">
+                                {product.shopSummaries.length} shops
+                              </p>
+                              <div className="space-y-1">
+                                {product.shopSummaries.map((shop) => (
+                                  <div
+                                    key={shop.shopName}
+                                    className="flex items-center justify-between gap-3"
+                                  >
+                                    <span className="truncate">
+                                      {shop.shopName}
+                                    </span>
+                                    <span className="shrink-0 font-semibold text-zinc-950">
+                                      {shop.stock}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-5 py-4">
                       <span className="inline-flex rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700">
@@ -628,7 +769,7 @@ export function ProductCatalog({
                       ? "Exchange"
                       : "Regular",
                   ],
-                  ["Shop", selectedProduct.shopName],
+                  ["Shop", selectedProductShopLabel],
                   ["Category", selectedProduct.categoryName],
                   ["Brand", selectedProduct.brandName],
                   ...(canManageProducts
