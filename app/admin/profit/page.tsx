@@ -13,7 +13,13 @@ const formatter = new Intl.NumberFormat("en-IN");
 const pageSize = 5;
 
 type SearchParams = Record<string, string | string[] | undefined>;
-type ProfitTab = "overview" | "normal" | "exchange" | "purchases" | "resale";
+type ProfitTab =
+  | "overview"
+  | "normal"
+  | "exchange"
+  | "purchases"
+  | "resale"
+  | "services";
 type PageInfo = {
   endItem: number;
   safePage: number;
@@ -36,6 +42,7 @@ type ExchangeRow = Prisma.ExchangeGetPayload<{
   };
 }>;
 type CustomerRow = Prisma.CustomerGetPayload<Record<string, never>>;
+type ServiceRow = Prisma.ServiceComplaintGetPayload<Record<string, never>>;
 
 const profitTabs: Array<{
   key: ProfitTab;
@@ -50,22 +57,27 @@ const profitTabs: Array<{
   {
     key: "normal",
     title: "Normal sales",
-    description: "Direct product sales",
+    description: "New product sold for cash",
   },
   {
     key: "exchange",
-    title: "Exchange sales",
-    description: "New product sold for old phone plus cash",
+    title: "Exchange",
+    description: "New phone sold with old phone",
   },
   {
     key: "purchases",
-    title: "Bought phones",
-    description: "Old phones bought from customers",
+    title: "Old phones bought",
+    description: "Phones bought for resale",
   },
   {
     key: "resale",
-    title: "Resale sales",
-    description: "Bought or exchanged phones sold again",
+    title: "Old phones sold",
+    description: "Resale profit after selling",
+  },
+  {
+    key: "services",
+    title: "Services",
+    description: "Repairs and custom service income",
   },
 ];
 
@@ -237,7 +249,7 @@ export default async function ProfitPage({
   const currentPage =
     Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1;
 
-  const [sales, exchanges, moneyCustomers] = await Promise.all([
+  const [sales, exchanges, moneyCustomers, services] = await Promise.all([
     prisma.sale.findMany({
       include: {
         employee: true,
@@ -263,6 +275,11 @@ export default async function ProfitPage({
       where: {
         type: "MONEY",
       },
+      orderBy: {
+        createdAt: "desc",
+      },
+    }),
+    prisma.serviceComplaint.findMany({
       orderBy: {
         createdAt: "desc",
       },
@@ -328,17 +345,15 @@ export default async function ProfitPage({
     moneyCustomers,
     (customer) => customer.amount
   );
-  const purchaseExpectedResale = sumBy(
-    moneyCustomers,
-    (customer) => customer.resalePrice
-  );
-  const purchasePotentialProfit = purchaseExpectedResale - purchaseInvestment;
-  const realizedProfit = normalProfit + exchangeProfit + resaleProfit;
+  const serviceProfit = sumBy(services, (service) => service.servicePrice);
+  const realizedProfit =
+    normalProfit + exchangeProfit + resaleProfit + serviceProfit;
 
   const paginatedNormal = paginate(normalSales, currentPage);
   const paginatedExchange = paginate(exchanges, currentPage);
   const paginatedPurchases = paginate(moneyCustomers, currentPage);
   const paginatedResale = paginate(resaleSales, currentPage);
+  const paginatedServices = paginate(services, currentPage);
   const selectedSales = activeTab === "resale" ? resaleSales : normalSales;
   const selectedPagination =
     activeTab === "exchange"
@@ -347,7 +362,9 @@ export default async function ProfitPage({
         ? paginatedPurchases
         : activeTab === "resale"
           ? paginatedResale
-          : paginatedNormal;
+          : activeTab === "services"
+            ? paginatedServices
+            : paginatedNormal;
 
   return (
     <div className="space-y-5">
@@ -357,10 +374,8 @@ export default async function ProfitPage({
         </p>
         <h1 className="mt-1 text-3xl font-semibold text-zinc-950">Profit</h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-600">
-          This page separates normal billing profit, exchange sale profit,
-          phone purchase investment, and resale profit. Exchange cash received
-          is shown separately because cash received is not always the same as
-          profit.
+          Profit is split into confirmed sales, exchange deals, old phones sold
+          again, and service income.
         </p>
       </section>
 
@@ -459,70 +474,69 @@ export default async function ProfitPage({
                   {currency.format(realizedProfit)}
                 </p>
                 <p className="mt-3 text-sm text-zinc-600">
-                  Confirmed profit means money already earned from completed
-                  sales.
+                  Confirmed profit means profit from phones already sold.
                 </p>
               </div>
 
               <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <MoneyStat
-                  label="Direct sale profit"
+                  label="Normal sale profit"
                   tone="good"
                   value={normalProfit}
                 />
                 <MoneyStat
-                  label="Exchange new phone profit"
+                  label="Exchange profit"
                   tone="good"
                   value={exchangeProfit}
                 />
                 <MoneyStat
-                  label="Old phone resale profit"
+                  label="Old phone sale profit"
                   tone="good"
                   value={resaleProfit}
                 />
                 <MoneyStat
-                  label="Expected profit from unsold phones"
-                  tone="warn"
-                  value={purchasePotentialProfit}
+                  label="Service income"
+                  tone="good"
+                  value={serviceProfit}
                 />
               </div>
 
               <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <MoneyStat
-                  label="Extra cash from exchange"
+                  label="Cash received in exchange"
                   value={exchangeCashReceived}
                 />
                 <MoneyStat
-                  label="Old phone value taken"
+                  label="Old phone value"
                   value={exchangeOldPhoneValue}
                 />
                 <MoneyStat
-                  label="Paid for old phones"
+                  label="Old phones bought cost"
                   value={purchaseInvestment}
                 />
-                <MoneyStat
-                  label="Planned selling price"
-                  value={purchaseExpectedResale}
-                />
+                <CountStat label="Services" value={services.length} />
               </div>
 
               <div className="mt-5 rounded-lg bg-zinc-50 px-4 py-3 text-sm leading-6 text-zinc-600">
                 <p className="font-medium text-zinc-800">
-                  Simple examples for owner:
+                  Simple meaning:
                 </p>
                 <p className="mt-2">
-                  Direct sale: customer paid ₹19,000 and your cost is ₹15,000,
-                  profit is ₹4,000.
+                  Normal sale: customer pays cash for a new phone. Profit is
+                  selling amount minus your cost.
                 </p>
                 <p>
-                  Exchange: customer gives old phone worth ₹15,000 and pays
-                  ₹5,000 extra for a ₹20,000 new phone. Profit depends on the new
-                  phone cost. The old phone value is stock for future resale.
+                  Exchange: customer gives an old phone and some cash for a new
+                  phone. Profit here is only for the new phone. The old phone
+                  becomes stock.
                 </p>
                 <p>
-                  Bought phones: if you paid ₹8,000 for an old phone and plan to
-                  sell it for ₹10,000, ₹2,000 is expected profit until it is
-                  actually sold.
+                  Old phone sale: when that old phone is sold again, its profit
+                  is counted in old phone sale profit.
+                </p>
+                <p>
+                  Services: repair or custom service price is counted as service
+                  income.
                 </p>
               </div>
             </section>
@@ -581,30 +595,29 @@ export default async function ProfitPage({
                   Exchange sales
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-zinc-600">
-                  In exchange, the customer buys a new product by giving an old
-                  phone plus extra cash. Profit is calculated on the new product
-                  sold. The old phone value becomes inventory cost for resale.
+                  Customer gives an old phone and pays some cash for a new
+                  phone. This tab counts profit from the new phone only.
                 </p>
                 <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                   <MoneyStat
-                    label="Exchange sale profit"
+                    label="Profit"
                     tone="good"
                     value={exchangeProfit}
                   />
                   <MoneyStat
-                    label="New product sale value"
+                    label="New phone selling price"
                     value={exchangeSalesValue}
                   />
                   <MoneyStat
-                    label="New product purchase cost"
+                    label="New phone cost"
                     value={exchangeSoldCost}
                   />
                   <MoneyStat
-                    label="Cash received"
+                    label="Cash paid by customer"
                     value={exchangeCashReceived}
                   />
                   <MoneyStat
-                    label="Old phone value added"
+                    label="Old phone stock value"
                     value={exchangeOldPhoneValue}
                   />
                 </div>
@@ -621,26 +634,16 @@ export default async function ProfitPage({
             <>
               <section className="rounded-[18px] border border-zinc-200 bg-white p-5">
                 <h2 className="text-2xl font-semibold text-zinc-950">
-                  Bought phones
+                  Old phones bought
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-zinc-600">
-                  These are old phones bought from customers. This is not real
-                  profit yet. Profit is confirmed after the phone is sold again
-                  through billing.
+                  These phones are stock. Cost is shown here, but profit is
+                  counted only after the phone is sold again.
                 </p>
-                <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <div className="mt-5 grid gap-3 md:grid-cols-2">
                   <MoneyStat
-                    label="Paid for old phones"
+                    label="Cost paid"
                     value={purchaseInvestment}
-                  />
-                  <MoneyStat
-                    label="Planned selling price"
-                    value={purchaseExpectedResale}
-                  />
-                  <MoneyStat
-                    label="Expected profit"
-                    tone="warn"
-                    value={purchasePotentialProfit}
                   />
                   <CountStat label="Phones bought" value={moneyCustomers.length} />
                 </div>
@@ -675,8 +678,7 @@ export default async function ProfitPage({
                   <CountStat label="Sales" value={resaleSales.length} />
                 </div>
                 <p className="mt-4 rounded-lg bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
-                  Resale profit is counted when the bought or exchanged phone is
-                  sold in billing.
+                  This is final profit from old phones sold again.
                 </p>
               </section>
               <SalesTable
@@ -685,6 +687,33 @@ export default async function ProfitPage({
                 rows={paginatedResale.rows}
                 tab="resale"
                 totalItems={resaleSales.length}
+              />
+            </>
+          )}
+
+          {activeTab === "services" && (
+            <>
+              <section className="rounded-[18px] border border-zinc-200 bg-white p-5">
+                <h2 className="text-2xl font-semibold text-zinc-950">
+                  Services
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-zinc-600">
+                  Display changes, speaker repairs, and other custom service
+                  entries are counted as service income.
+                </p>
+                <div className="mt-5 grid gap-3 md:grid-cols-2">
+                  <MoneyStat
+                    label="Service income"
+                    tone="good"
+                    value={serviceProfit}
+                  />
+                  <CountStat label="Services" value={services.length} />
+                </div>
+              </section>
+              <ServiceTable
+                pageInfo={paginatedServices}
+                rows={paginatedServices.rows}
+                totalItems={services.length}
               />
             </>
           )}
@@ -698,7 +727,9 @@ export default async function ProfitPage({
                   ? selectedSales.length
                   : activeTab === "exchange"
                     ? exchanges.length
-                    : moneyCustomers.length
+                    : activeTab === "purchases"
+                      ? moneyCustomers.length
+                      : services.length
               )}
             </p>
           )}
@@ -731,7 +762,7 @@ function SalesTable({
       </div>
       <div className="overflow-x-auto">
         {rows.length > 0 ? (
-          <table className="w-full min-w-[980px] border-collapse text-left">
+          <table className="w-full min-w-[820px] border-collapse text-left">
             <thead className="bg-zinc-50 text-xs font-semibold uppercase text-zinc-500">
               <tr>
                 <th className="px-5 py-3">Product</th>
@@ -811,7 +842,7 @@ function ExchangeTable({
           Exchange details
         </h2>
         <p className="text-sm text-zinc-500">
-          Latest 5 exchange sales with cash and old phone value.
+          Latest 5 exchange deals.
         </p>
       </div>
       <div className="overflow-x-auto">
@@ -819,13 +850,13 @@ function ExchangeTable({
           <table className="w-full min-w-[1120px] border-collapse text-left">
             <thead className="bg-zinc-50 text-xs font-semibold uppercase text-zinc-500">
               <tr>
-                <th className="px-5 py-3">New product sold</th>
-                <th className="px-5 py-3">Old phone received</th>
+                <th className="px-5 py-3">New phone sold</th>
+                <th className="px-5 py-3">Old phone taken</th>
                 <th className="px-5 py-3">Shop</th>
                 <th className="px-5 py-3">Employee</th>
-                <th className="px-5 py-3">Sale value</th>
-                <th className="px-5 py-3">Product cost</th>
-                <th className="px-5 py-3">Cash received</th>
+                <th className="px-5 py-3">Selling price</th>
+                <th className="px-5 py-3">Cost</th>
+                <th className="px-5 py-3">Cash paid</th>
                 <th className="px-5 py-3">Old phone value</th>
                 <th className="px-5 py-3 text-right">Profit</th>
               </tr>
@@ -922,8 +953,6 @@ function PurchaseTable({
                 <th className="px-5 py-3">Shop</th>
                 <th className="px-5 py-3">Employee</th>
                 <th className="px-5 py-3">Paid amount</th>
-                <th className="px-5 py-3">Planned selling price</th>
-                <th className="px-5 py-3 text-right">Potential profit</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100 text-sm">
@@ -954,12 +983,6 @@ function PurchaseTable({
                   <td className="px-5 py-4 font-medium text-zinc-900">
                     {currency.format(customer.amount)}
                   </td>
-                  <td className="px-5 py-4 text-zinc-600">
-                    {currency.format(customer.resalePrice)}
-                  </td>
-                  <td className="px-5 py-4 text-right font-semibold text-amber-700">
-                    {currency.format(customer.resalePrice - customer.amount)}
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -971,6 +994,90 @@ function PurchaseTable({
       <Pagination
         page={pageInfo.safePage}
         tab="purchases"
+        totalItems={totalItems}
+        totalPages={pageInfo.totalPages}
+      />
+    </section>
+  );
+}
+
+function ServiceTable({
+  pageInfo,
+  rows,
+  totalItems,
+}: {
+  pageInfo: PageInfo;
+  rows: ServiceRow[];
+  totalItems: number;
+}) {
+  return (
+    <section className="rounded-[18px] border border-zinc-200 bg-white">
+      <div className="border-b border-zinc-100 p-5">
+        <h2 className="text-xl font-semibold text-zinc-950">
+          Service details
+        </h2>
+        <p className="text-sm text-zinc-500">
+          Latest 5 service records with customer complaint and price.
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        {rows.length > 0 ? (
+          <table className="w-full min-w-[980px] border-collapse text-left">
+            <thead className="bg-zinc-50 text-xs font-semibold uppercase text-zinc-500">
+              <tr>
+                <th className="px-5 py-3">Customer</th>
+                <th className="px-5 py-3">Device</th>
+                <th className="px-5 py-3">Complaint</th>
+                <th className="px-5 py-3">Notes</th>
+                <th className="px-5 py-3">Date</th>
+                <th className="px-5 py-3 text-right">Income</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100 text-sm">
+              {rows.map((service) => (
+                <tr key={service.id}>
+                  <td className="px-5 py-4">
+                    <p className="font-medium text-zinc-950">
+                      {service.customerName}
+                    </p>
+                    <p className="mt-1 text-xs text-zinc-500">
+                      {service.phone || "Phone not added"}
+                    </p>
+                  </td>
+                  <td className="px-5 py-4 text-zinc-600">
+                    {service.deviceName || "Device not added"}
+                  </td>
+                  <td className="px-5 py-4 font-medium text-zinc-950">
+                    {service.complaint}
+                  </td>
+                  <td className="max-w-[280px] px-5 py-4 text-zinc-600">
+                    <span className="line-clamp-2">
+                      {service.notes || "Not added"}
+                    </span>
+                  </td>
+                  <td className="px-5 py-4 text-zinc-600">
+                    {service.createdAt.toLocaleString("en-IN", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </td>
+                  <td className="px-5 py-4 text-right font-semibold text-emerald-700">
+                    {currency.format(service.servicePrice)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <EmptyState />
+        )}
+      </div>
+      <Pagination
+        page={pageInfo.safePage}
+        tab="services"
         totalItems={totalItems}
         totalPages={pageInfo.totalPages}
       />

@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import {
   ArrowLeft,
   Boxes,
+  ChevronLeft,
+  ChevronRight,
   Store,
   Tags,
 } from "lucide-react";
@@ -16,12 +18,17 @@ const currency = new Intl.NumberFormat("en-IN", {
 
 export default async function ShopDetailsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{
     id: string;
   }>;
+  searchParams?: Promise<{
+    productsPage?: string | string[];
+  }>;
 }) {
   const { id } = await params;
+  const query = await searchParams;
   const shop = await prisma.shop.findUnique({
     where: {
       id,
@@ -96,6 +103,24 @@ export default async function ShopDetailsPage({
     (sum, product) => sum + product.stock,
     0
   );
+  const productsPerPage = 7;
+  const rawProductsPage = Array.isArray(query?.productsPage)
+    ? query.productsPage[0]
+    : query?.productsPage;
+  const requestedProductsPage = Number.parseInt(rawProductsPage ?? "1", 10);
+  const totalProductPages = Math.max(
+    1,
+    Math.ceil(shop.products.length / productsPerPage)
+  );
+  const currentProductsPage = Number.isFinite(requestedProductsPage)
+    ? Math.min(Math.max(requestedProductsPage, 1), totalProductPages)
+    : 1;
+  const paginatedProducts = shop.products.slice(
+    (currentProductsPage - 1) * productsPerPage,
+    currentProductsPage * productsPerPage
+  );
+  const productPageHref = (page: number) =>
+    `/admin/shops/${id}?productsPage=${page}`;
 
   return (
     <div className="space-y-5">
@@ -180,7 +205,7 @@ export default async function ShopDetailsPage({
           </thead>
           <tbody className="divide-y divide-zinc-100 text-sm">
             {shop.products.length > 0 ? (
-              shop.products.map((product) => (
+              paginatedProducts.map((product) => (
                 <tr key={product.id} className="transition hover:bg-zinc-50">
                   <td className="px-5 py-4">
                     <p className="font-medium text-zinc-950">
@@ -231,6 +256,48 @@ export default async function ShopDetailsPage({
             )}
           </tbody>
         </table>
+        {shop.products.length > productsPerPage ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-100 px-5 py-4 text-sm">
+            <p className="text-zinc-500">
+              Showing {(currentProductsPage - 1) * productsPerPage + 1}-
+              {Math.min(
+                currentProductsPage * productsPerPage,
+                shop.products.length
+              )}{" "}
+              of {shop.products.length} products
+            </p>
+            <div className="flex items-center gap-2">
+              <PaginationLink
+                href={productPageHref(currentProductsPage - 1)}
+                disabled={currentProductsPage === 1}
+                label="Previous page"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </PaginationLink>
+              {Array.from({ length: totalProductPages }).map((_, index) => {
+                const page = index + 1;
+
+                return (
+                  <PaginationLink
+                    key={page}
+                    href={productPageHref(page)}
+                    active={page === currentProductsPage}
+                    label={`Page ${page}`}
+                  >
+                    {page}
+                  </PaginationLink>
+                );
+              })}
+              <PaginationLink
+                href={productPageHref(currentProductsPage + 1)}
+                disabled={currentProductsPage === totalProductPages}
+                label="Next page"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </PaginationLink>
+            </div>
+          </div>
+        ) : null}
       </TableCard>
 
       <div className="grid gap-5 xl:grid-cols-2">
@@ -243,8 +310,8 @@ export default async function ShopDetailsPage({
             <thead className="bg-zinc-50 text-xs font-semibold uppercase tracking-wide text-zinc-500">
               <tr>
                 <th className="px-5 py-4">Category</th>
-                <th className="px-5 py-4">Products</th>
-                <th className="px-5 py-4">Stock</th>
+                <th className="px-5 py-4">Added Product</th>
+                <th className="px-5 py-4">Balance</th>
                 <th className="px-5 py-4">Stock Value</th>
               </tr>
             </thead>
@@ -252,8 +319,12 @@ export default async function ShopDetailsPage({
               {Array.from(categorySummary.values()).map((category) => (
                 <tr key={category.name}>
                   <td className="px-5 py-4 font-medium">{category.name}</td>
-                  <td className="px-5 py-4">{category.products}</td>
-                  <td className="px-5 py-4">{category.stock}</td>
+                  <td className="px-5 py-4">
+                    <AddedProductCount count={category.products} />
+                  </td>
+                  <td className="px-5 py-4">
+                    <SummaryBalance quantity={category.stock} />
+                  </td>
                   <td className="px-5 py-4 font-semibold">
                     {currency.format(category.value)}
                   </td>
@@ -273,8 +344,8 @@ export default async function ShopDetailsPage({
               <tr>
                 <th className="px-5 py-4">Brand</th>
                 <th className="px-5 py-4">Category</th>
-                <th className="px-5 py-4">Products</th>
-                <th className="px-5 py-4">Stock</th>
+                <th className="px-5 py-4">Added Product</th>
+                <th className="px-5 py-4">Balance</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100 text-sm">
@@ -284,8 +355,12 @@ export default async function ShopDetailsPage({
                   <td className="px-5 py-4 text-zinc-700">
                     {brand.categoryName}
                   </td>
-                  <td className="px-5 py-4">{brand.products}</td>
-                  <td className="px-5 py-4">{brand.stock}</td>
+                  <td className="px-5 py-4">
+                    <AddedProductCount count={brand.products} />
+                  </td>
+                  <td className="px-5 py-4">
+                    <SummaryBalance quantity={brand.stock} />
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -322,5 +397,63 @@ function TableCard({
       </div>
       <div className="overflow-x-auto">{children}</div>
     </section>
+  );
+}
+
+function SummaryBalance({ quantity }: { quantity: number }) {
+  if (quantity <= 0) {
+    return (
+      <span className="font-semibold text-red-700">
+        Out of stock
+      </span>
+    );
+  }
+
+  return <span>{quantity} units</span>;
+}
+
+function AddedProductCount({ count }: { count: number }) {
+  return (
+    <span>
+      {count} {count === 1 ? "product" : "products"}
+    </span>
+  );
+}
+
+function PaginationLink({
+  href,
+  active = false,
+  disabled = false,
+  label,
+  children,
+}: {
+  href: string;
+  active?: boolean;
+  disabled?: boolean;
+  label: string;
+  children: React.ReactNode;
+}) {
+  const className = `inline-flex h-9 min-w-9 items-center justify-center rounded-full border px-3 font-semibold transition ${
+    active
+      ? "border-zinc-950 bg-zinc-950 text-white"
+      : "border-zinc-300 text-zinc-700 hover:bg-zinc-50"
+  } ${
+    disabled
+      ? "pointer-events-none border-zinc-200 text-zinc-300 hover:bg-transparent"
+      : ""
+  }`;
+
+  if (disabled) {
+    return (
+      <span aria-label={label} className={className}>
+        {children}
+      </span>
+    );
+  }
+
+  return (
+    <Link href={href} aria-label={label} className={className}>
+      {children}
+    </Link>
   );
 }

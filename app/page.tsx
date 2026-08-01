@@ -12,7 +12,7 @@ const entryCards = [
   {
     title: "Admin",
     description: "Manage shops, products, categories, inventory, employees, and reports.",
-    href: "/admin/admin-dashboard",
+    href: "/sign-in?role=admin",
     icon: ShieldCheck,
     accent: "bg-zinc-950 text-white",
     className: "bg-white",
@@ -20,7 +20,7 @@ const entryCards = [
   {
     title: "Employee",
     description: "Open billing, scan products, and review daily sales activity.",
-    href: "/employee/billing",
+    href: "/sign-in?role=employee",
     icon: ReceiptText,
     accent: "bg-[#ffdc5d] text-zinc-950",
     className: "bg-[#fff4bf]",

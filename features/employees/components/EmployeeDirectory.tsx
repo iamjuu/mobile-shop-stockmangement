@@ -8,6 +8,7 @@ interface EmployeeItem {
   id: string;
   name: string;
   email: string;
+  shopName: string;
   createdAt: string;
 }
 
@@ -42,6 +43,7 @@ export function EmployeeDirectory({ employees }: EmployeeDirectoryProps) {
             <tr>
               <th className="px-5 py-4">Employee</th>
               <th className="px-5 py-4">Email</th>
+              <th className="px-5 py-4">Shop</th>
               <th className="px-5 py-4">Created</th>
               <th className="px-5 py-4 text-right">Status</th>
             </tr>
@@ -69,6 +71,9 @@ export function EmployeeDirectory({ employees }: EmployeeDirectoryProps) {
                   <td className="px-5 py-4 text-zinc-700">
                     {employee.email}
                   </td>
+                  <td className="px-5 py-4 text-zinc-700">
+                    {employee.shopName}
+                  </td>
                   <td className="px-5 py-4 text-zinc-600">
                     {employee.createdAt}
                   </td>
@@ -82,7 +87,7 @@ export function EmployeeDirectory({ employees }: EmployeeDirectoryProps) {
             ) : (
               <tr>
                 <td
-                  colSpan={4}
+                  colSpan={5}
                   className="px-5 py-12 text-center text-sm text-zinc-500"
                 >
                   No employees found. Create an employee account for billing access.

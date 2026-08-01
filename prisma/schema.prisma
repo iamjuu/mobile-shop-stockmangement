@@ -36,6 +36,9 @@ model User {
 
   role Role @default(EMPLOYEE)
 
+  shopId String? @db.ObjectId
+  shop   Shop?   @relation(fields: [shopId], references: [id])
+
   sales     Sale[]
   exchanges Exchange[]
 
@@ -55,6 +58,7 @@ model Shop {
   categories Category[]
   sales      Sale[]
   exchanges Exchange[]
+  employees  User[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

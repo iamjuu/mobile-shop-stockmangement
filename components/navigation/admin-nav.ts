@@ -8,6 +8,7 @@ import {
   Users,
   BarChart3,
   RefreshCcw,
+  Wrench,
   IndianRupee,
   type LucideIcon,
 } from "lucide-react";
@@ -53,6 +54,11 @@ export const adminNavItems: AdminNavItem[] = [
     title: "Exchange",
     href: "/admin/exchanges",
     icon: RefreshCcw,
+  },
+  {
+    title: "Services",
+    href: "/admin/services",
+    icon: Wrench,
   },
   {
     title: "Users",

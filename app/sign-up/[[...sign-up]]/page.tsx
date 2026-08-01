@@ -18,7 +18,6 @@ async function signUp(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
-  const role = formData.get("role") === "ADMIN" ? "ADMIN" : "EMPLOYEE";
 
   if (!name || !email || !password) {
     redirect("/sign-up?error=All%20fields%20are%20required");
@@ -50,7 +49,7 @@ async function signUp(formData: FormData) {
         name,
         email,
         passwordHash: hashPassword(password),
-        role,
+        role: "ADMIN",
       },
     });
   } catch {
@@ -59,11 +58,7 @@ async function signUp(formData: FormData) {
 
   await createAuthSession(user);
 
-  if (user.role === "ADMIN") {
-    redirect("/admin/admin-dashboard");
-  }
-
-  redirect("/employee/billing");
+  redirect("/admin/admin-dashboard");
 }
 
 const features = [
@@ -101,8 +96,8 @@ export default async function Page({ searchParams }: PageProps) {
                 Start managing inventory, shops, and daily sales.
               </h2>
               <p className="mt-6 max-w-2xl text-base leading-7 text-zinc-300">
-                Create an admin account for setup or an employee account for
-                billing workflows.
+                Create an admin account for setup. Employee accounts are added
+                from the admin workspace.
               </p>
             </div>
           </div>
@@ -132,7 +127,7 @@ export default async function Page({ searchParams }: PageProps) {
                 Sign up
               </h2>
               <p className="mt-3 text-sm leading-6 text-zinc-600">
-                Set up access for admin or employee workflows.
+                Set up admin access for inventory and employee management.
               </p>
             </div>
 
@@ -193,24 +188,6 @@ export default async function Page({ searchParams }: PageProps) {
                   required
                   className="w-full rounded-full border border-zinc-300 px-4 py-3 text-sm outline-none transition focus:border-zinc-950"
                 />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="role"
-                  className="mb-2 block text-sm font-medium text-zinc-700"
-                >
-                  Role
-                </label>
-                <select
-                  id="role"
-                  name="role"
-                  defaultValue="EMPLOYEE"
-                  className="w-full   rounded-full border border-zinc-300 px-4 py-3 text-sm outline-none transition focus:border-zinc-950"
-                >
-                  <option value="EMPLOYEE">Employee</option>
-                  <option value="ADMIN">Admin</option>
-                </select>
               </div>
 
               <PendingSubmitButton

@@ -1,11 +1,14 @@
 import { Boxes } from "lucide-react";
 import { revalidatePath } from "next/cache";
 
-import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { CategoryService } from "@/features/categories/services/category.service";
-import { BrandCategoryPicker } from "@/features/subcategories/components/BrandCategoryPicker";
+import {
+  BrandCreateForm,
+  type BrandCreateState,
+} from "@/features/subcategories/components/BrandCreateForm";
 import { BrandDirectory } from "@/features/subcategories/components/BrandDirectory";
 import { SubCategoryService } from "@/features/subcategories/services/subcategory.service";
+import { cleanName, normalizeName } from "@/lib/normalize-name";
 import { prisma } from "@/lib/prisma";
 
 export default async function SubcategoriesPage() {
@@ -19,17 +22,23 @@ export default async function SubcategoriesPage() {
     subCategoryService.getAll(),
   ]);
 
-  async function createSubcategory(formData: FormData) {
+  async function createSubcategory(
+    _state: BrandCreateState,
+    formData: FormData
+  ): Promise<BrandCreateState> {
     "use server";
 
-    const name = String(formData.get("name") ?? "").trim();
+    const name = cleanName(String(formData.get("name") ?? ""));
     const categoryScope = String(formData.get("categoryScope") ?? "");
-    const selectedCategoryIds = formData
-      .getAll("categoryIds")
-      .map((value) => String(value));
+    const selectedCategoryIds = Array.from(
+      new Set(formData.getAll("categoryIds").map((value) => String(value)))
+    );
 
-    if (!name) {
-      return;
+    if (name.length < 2) {
+      return {
+        ok: false,
+        message: "Enter a brand name with at least 2 characters.",
+      };
     }
 
     const service = new SubCategoryService();
@@ -45,7 +54,52 @@ export default async function SubcategoriesPage() {
         : selectedCategoryIds;
 
     if (categoryIds.length === 0) {
-      return;
+      return {
+        ok: false,
+        message: "Select at least one category.",
+      };
+    }
+
+    const validCategoryCount = await prisma.category.count({
+      where: {
+        id: {
+          in: categoryIds,
+        },
+      },
+    });
+
+    if (validCategoryCount !== categoryIds.length) {
+      return {
+        ok: false,
+        message: "One or more selected categories are invalid.",
+      };
+    }
+
+    const matchingBrands = await prisma.subCategory.findMany({
+      where: {
+        categoryId: {
+          in: categoryIds,
+        },
+      },
+      include: {
+        category: {
+          include: {
+            shop: true,
+          },
+        },
+      },
+    });
+    const duplicateBrand = matchingBrands.find(
+      (brand) => normalizeName(brand.name) === normalizeName(name)
+    );
+
+    if (duplicateBrand) {
+      return {
+        ok: false,
+        message: `Brand already exists under ${duplicateBrand.category.name} (${
+          duplicateBrand.category.shop?.shopName ?? "All shops"
+        }).`,
+      };
     }
 
     await Promise.all(
@@ -53,6 +107,18 @@ export default async function SubcategoriesPage() {
     );
 
     revalidatePath("/admin/subcategories");
+    revalidatePath("/admin/products");
+    revalidatePath("/admin/product-catalog");
+    revalidatePath("/employee/product-catalog");
+    revalidatePath("/employee/exchange");
+
+    return {
+      ok: true,
+      message:
+        categoryIds.length === 1
+          ? "Brand created successfully."
+          : `${categoryIds.length} brands created successfully.`,
+    };
   }
 
   async function updateSubcategory(
@@ -64,7 +130,7 @@ export default async function SubcategoriesPage() {
   ) {
     "use server";
 
-    const name = data.name.trim();
+    const name = cleanName(data.name);
     const categoryIds = [...new Set(data.categoryIds)];
 
     if (
@@ -96,6 +162,38 @@ export default async function SubcategoriesPage() {
     const currentCategoryIds = currentRecords.map(
       (record) => record.categoryId
     );
+    const matchingBrands = await prisma.subCategory.findMany({
+      where: {
+        categoryId: {
+          in: categoryIds,
+        },
+        NOT: {
+          id: {
+            in: subcategoryIds,
+          },
+        },
+      },
+      include: {
+        category: {
+          include: {
+            shop: true,
+          },
+        },
+      },
+    });
+    const duplicateBrand = matchingBrands.find(
+      (brand) => normalizeName(brand.name) === normalizeName(name)
+    );
+
+    if (duplicateBrand) {
+      return {
+        ok: false,
+        message: `Brand already exists under ${duplicateBrand.category.name} (${
+          duplicateBrand.category.shop?.shopName ?? "All shops"
+        }).`,
+      };
+    }
+
     const categoriesToAdd = categoryIds.filter(
       (categoryId) => !currentCategoryIds.includes(categoryId)
     );
@@ -300,56 +398,14 @@ export default async function SubcategoriesPage() {
             Electronics you can add Mobiles, Laptops, Chargers, or Accessories.
           </p>
 
-          <form
+          <BrandCreateForm
+            categories={categories.map((category) => ({
+              id: category.id,
+              name: category.name,
+              shopName: category.shop?.shopName ?? "All shops",
+            }))}
             action={createSubcategory}
-            className="mt-6 space-y-4"
-          >
-            <div>
-              <label
-                htmlFor="name"
-                className="mb-2 block text-sm font-medium text-zinc-700"
-              >
-                Brand name
-              </label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                required
-                placeholder="Example: Mobiles"
-                className="w-full rounded-full border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-950"
-              />
-            </div>
-
-            <div>
-              <label
-                className="mb-2 block text-sm font-medium text-zinc-700"
-              >
-                Category
-              </label>
-              <BrandCategoryPicker
-                categories={categories.map((category) => ({
-                  id: category.id,
-                  name: category.name,
-                  shopName: category.shop?.shopName ?? "All shops",
-                }))}
-              />
-            </div>
-
-            <PendingSubmitButton
-              disabled={categories.length === 0}
-              pendingLabel="Creating brand..."
-              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
-            >
-              Create Brand
-            </PendingSubmitButton>
-
-            {categories.length === 0 ? (
-              <p className="text-sm text-red-600">
-                Create a category before adding brands.
-              </p>
-            ) : null}
-          </form>
+          />
         </section>
 
         <BrandDirectory

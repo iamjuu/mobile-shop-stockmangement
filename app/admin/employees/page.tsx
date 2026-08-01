@@ -1,40 +1,81 @@
 import { revalidatePath } from "next/cache";
 import { Users } from "lucide-react";
 
-import { PendingSubmitButton } from "@/components/pending-submit-button";
+import {
+  EmployeeCreateForm,
+  type EmployeeCreateState,
+} from "@/features/employees/components/EmployeeCreateForm";
 import { EmployeeDirectory } from "@/features/employees/components/EmployeeDirectory";
 import { hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export default async function EmployeesPage() {
-  const employees = await prisma.user.findMany({
-    where: {
-      role: "EMPLOYEE",
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+  const [employees, shops] = await Promise.all([
+    prisma.user.findMany({
+      where: {
+        role: "EMPLOYEE",
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    }),
+    prisma.shop.findMany({
+      orderBy: {
+        shopName: "asc",
+      },
+    }),
+  ]);
 
-  async function createEmployee(formData: FormData) {
+  async function createEmployee(
+    _state: EmployeeCreateState,
+    formData: FormData
+  ): Promise<EmployeeCreateState> {
     "use server";
 
+    const shopId = String(formData.get("shopId") ?? "");
     const name = String(formData.get("name") ?? "").trim();
     const email = String(formData.get("email") ?? "").trim().toLowerCase();
     const password = String(formData.get("password") ?? "");
 
-    if (!name || !email || password.length < 8) {
-      return;
+    if (!shopId) {
+      return {
+        ok: false,
+        message: "Choose a shop for this employee.",
+      };
     }
 
-    const existingUser = await prisma.user.findUnique({
-      where: {
-        email,
-      },
-    });
+    if (!name || !email || password.length < 8) {
+      return {
+        ok: false,
+        message: "Enter employee name, email, and an 8 character password.",
+      };
+    }
+
+    const [shop, existingUser] = await Promise.all([
+      prisma.shop.findUnique({
+        where: {
+          id: shopId,
+        },
+      }),
+      prisma.user.findUnique({
+        where: {
+          email,
+        },
+      }),
+    ]);
+
+    if (!shop) {
+      return {
+        ok: false,
+        message: "Selected shop is invalid.",
+      };
+    }
 
     if (existingUser) {
-      return;
+      return {
+        ok: false,
+        message: "An account with this email already exists.",
+      };
     }
 
     await prisma.user.create({
@@ -43,17 +84,34 @@ export default async function EmployeesPage() {
         email,
         passwordHash: hashPassword(password),
         role: "EMPLOYEE",
+        shopId: shop.id,
       },
     });
 
     revalidatePath("/admin/employees");
     revalidatePath("/admin/admin-dashboard");
+
+    return {
+      ok: true,
+      message: "Employee created successfully.",
+    };
   }
 
+  const directoryShops = shops.map((shop) => ({
+    id: shop.id,
+    shopName: shop.shopName,
+  }));
+  const shopNamesById = new Map(
+    shops.map((shop) => [shop.id, shop.shopName])
+  );
   const directoryEmployees = employees.map((employee) => ({
     id: employee.id,
     name: employee.name,
     email: employee.email,
+    shopName:
+      shopNamesById.get(
+        (employee as { shopId?: string | null }).shopId ?? ""
+      ) ?? "No shop assigned",
     createdAt: employee.createdAt.toLocaleDateString("en-IN", {
       day: "2-digit",
       month: "short",
@@ -73,80 +131,19 @@ export default async function EmployeesPage() {
               <p className="text-sm font-medium text-zinc-500">
                 Staff access
               </p>
-              <h1 className="text-3xl font-semibold">
-                Employees
-              </h1>
+              <h1 className="text-3xl font-semibold">Employees</h1>
             </div>
           </div>
 
           <p className="mt-4 text-sm leading-6 text-zinc-500">
             Create employee accounts for billing and shop operations. Employees
-            can sign in and access the employee workspace.
+            can sign in only with their assigned shop.
           </p>
 
-          <form
+          <EmployeeCreateForm
+            shops={directoryShops}
             action={createEmployee}
-            className="mt-6 space-y-4"
-          >
-            <div>
-              <label
-                htmlFor="name"
-                className="mb-2 block text-sm font-medium text-zinc-700"
-              >
-                Employee name
-              </label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                required
-                placeholder="Example: Rahul Kumar"
-                className="w-full rounded-full border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-950"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="email"
-                className="mb-2 block text-sm font-medium text-zinc-700"
-              >
-                Email
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                required
-                placeholder="employee@example.com"
-                className="w-full rounded-full border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-950"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="password"
-                className="mb-2 block text-sm font-medium text-zinc-700"
-              >
-                Temporary password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                minLength={8}
-                required
-                placeholder="Minimum 8 characters"
-                className="w-full rounded-full border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-950"
-              />
-            </div>
-
-            <PendingSubmitButton
-              pendingLabel="Creating employee..."
-              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
-            >
-              Create Employee
-            </PendingSubmitButton>
-          </form>
+          />
         </section>
 
         <EmployeeDirectory employees={directoryEmployees} />

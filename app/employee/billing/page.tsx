@@ -6,17 +6,37 @@ import { activeProductWhere } from "@/lib/product-filters";
 import { prisma } from "@/lib/prisma";
 
 export default async function BillingPage() {
+  const employeeId = await getCurrentUserId();
+  const employee = await prisma.user.findUnique({
+    where: {
+      id: employeeId,
+    },
+    include: {
+      shop: true,
+    },
+  });
+  const assignedShopId = employee?.shopId ?? "";
   const [
     shops,
     products,
   ] = await Promise.all([
     prisma.shop.findMany({
+      where: assignedShopId
+        ? {
+            id: assignedShopId,
+          }
+        : {
+            id: "__missing_shop__",
+          },
       orderBy: {
         shopName: "asc",
       },
     }),
     prisma.product.findMany({
-      where: activeProductWhere,
+      where: {
+        ...activeProductWhere,
+        shopId: assignedShopId || "__missing_shop__",
+      },
       include: {
         shop: true,
         category: true,
@@ -31,7 +51,7 @@ export default async function BillingPage() {
   async function sellProduct(formData: FormData) {
     "use server";
 
-    const employeeId = await getCurrentUserId();
+    const currentEmployeeId = await getCurrentUserId();
     const productId = String(formData.get("productId") ?? "");
     const quantity = Math.trunc(Number(formData.get("quantity") ?? 0));
     const discount = Math.max(0, Number(formData.get("discount") ?? 0) || 0);
@@ -40,7 +60,7 @@ export default async function BillingPage() {
     const [employee, product] = await Promise.all([
       prisma.user.findUnique({
         where: {
-          id: employeeId,
+          id: currentEmployeeId,
         },
       }),
       prisma.product.findUnique({
@@ -58,7 +78,9 @@ export default async function BillingPage() {
 
     if (
       !employee ||
+      !employee.shopId ||
       !product ||
+      product.shopId !== employee.shopId ||
       quantity < 1 ||
       product.stock < quantity ||
       discount > subtotal
@@ -86,7 +108,7 @@ export default async function BillingPage() {
         }),
         prisma.sale.create({
           data: {
-            employeeId,
+            employeeId: currentEmployeeId,
             productId: product.id,
             shopId: product.shopId,
             productCode: product.productCode,

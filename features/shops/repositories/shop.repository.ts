@@ -17,6 +17,22 @@ export class ShopRepository {
     });
   }
 
+  findByNameCandidates(excludeId?: string) {
+    return prisma.shop.findMany({
+      where: excludeId
+        ? {
+            NOT: {
+              id: excludeId,
+            },
+          }
+        : undefined,
+      select: {
+        id: true,
+        shopName: true,
+      },
+    });
+  }
+
   create(data: ShopFormValues) {
     return prisma.shop.create({
       data,

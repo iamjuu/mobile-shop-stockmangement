@@ -21,6 +21,11 @@ interface SubcategoryOption {
   categoryId: string;
 }
 
+interface ShopOption {
+  id: string;
+  shopName: string;
+}
+
 interface ProductCatalogItem {
   id: string;
   productCode: string;
@@ -28,6 +33,7 @@ interface ProductCatalogItem {
   categoryId: string;
   categoryName: string;
   subcategoryId: string;
+  shopId: string;
   shopName: string;
   brandName: string;
   purchasePrice?: number | null;
@@ -41,6 +47,7 @@ interface ProductCatalogItem {
 }
 
 type ProductShopSummary = {
+  shopId: string;
   shopName: string;
   stock: number;
   recordCount: number;
@@ -54,11 +61,13 @@ type ProductCatalogRow = ProductCatalogItem & {
 interface ProductCatalogProps {
   categories: ProductCatalogCategory[];
   products: ProductCatalogItem[];
+  shops?: ShopOption[];
   subcategories?: SubcategoryOption[];
   updateAction?: (
     productId: string,
     data: {
       productName: string;
+      shopIds: string[];
       subcategoryId: string;
       purchasePrice: number;
       price: number;
@@ -122,6 +131,7 @@ function mergeShopSummary(
   return [
     ...shopSummaries,
     {
+      shopId: product.shopId,
       shopName: product.shopName,
       stock: product.stock,
       recordCount: 1,
@@ -145,6 +155,7 @@ function groupProducts(products: ProductCatalogItem[]) {
         recordCount: 1,
         shopSummaries: [
           {
+            shopId: product.shopId,
             shopName: product.shopName,
             stock: product.stock,
             recordCount: 1,
@@ -171,6 +182,7 @@ function groupProducts(products: ProductCatalogItem[]) {
 export function ProductCatalog({
   categories,
   products,
+  shops = [],
   subcategories = [],
   updateAction,
   deleteAction,
@@ -186,10 +198,11 @@ export function ProductCatalog({
   const [selectedProduct, setSelectedProduct] =
     useState<ProductCatalogRow | null>(null);
   const [editProduct, setEditProduct] =
-    useState<ProductCatalogItem | null>(null);
+    useState<ProductCatalogRow | null>(null);
   const [deleteProduct, setDeleteProduct] =
-    useState<ProductCatalogItem | null>(null);
+    useState<ProductCatalogRow | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [editSelectedShopIds, setEditSelectedShopIds] = useState<string[]>([]);
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState(
@@ -333,6 +346,7 @@ export function ProductCatalog({
       );
       const updatedProduct = {
         productName: String(formData.get("productName") ?? ""),
+        shopIds: editSelectedShopIds,
         subcategoryId,
         purchasePrice: Number(formData.get("purchasePrice") ?? 0),
         price: Number(formData.get("price") ?? 0),
@@ -345,6 +359,8 @@ export function ProductCatalog({
 
       if (result.ok) {
         const brandName = selectedBrand?.name ?? editProduct.brandName;
+        const selectedShop =
+          shops.find((shop) => shop.id === editSelectedShopIds[0]) ?? null;
         setLocalProducts((currentProducts) =>
           currentProducts.map((product) =>
             product.id === editProduct.id
@@ -352,6 +368,8 @@ export function ProductCatalog({
                   ...product,
                   ...updatedProduct,
                   productName: updatedProduct.productName.trim(),
+                  shopId: selectedShop?.id ?? product.shopId,
+                  shopName: selectedShop?.shopName ?? product.shopName,
                   brandName,
                   stock: Math.trunc(updatedProduct.stock),
                   description: updatedProduct.description.trim() || null,
@@ -372,6 +390,7 @@ export function ProductCatalog({
             : currentProduct
         );
         setEditProduct(null);
+        setEditSelectedShopIds([]);
         router.refresh();
       }
     } finally {
@@ -657,6 +676,9 @@ export function ProductCatalog({
                             className="inline-flex items-center justify-center rounded-full px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
                             onClick={(event) => {
                               event.stopPropagation();
+                              setEditSelectedShopIds(
+                                product.shopSummaries.map((shop) => shop.shopId)
+                              );
                               setEditProduct(product);
                             }}
                             aria-label={`Edit ${product.productName}`}
@@ -836,6 +858,7 @@ export function ProductCatalog({
                 className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-300 hover:bg-zinc-50"
                 onClick={() => {
                   setEditProduct(null);
+                  setEditSelectedShopIds([]);
                 }}
                 aria-label="Close edit product"
               >
@@ -844,6 +867,37 @@ export function ProductCatalog({
             </div>
 
             <form action={handleUpdate} className="space-y-4 p-5">
+              <div className="grid gap-3 rounded-3xl bg-zinc-50 p-4 sm:grid-cols-3">
+                <div>
+                  <p className="text-xs font-medium uppercase text-zinc-500">
+                    Product
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-zinc-950">
+                    {editProduct.productName}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase text-zinc-500">
+                    Category
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-zinc-950">
+                    {editProduct.categoryName}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase text-zinc-500">
+                    Current shop
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-zinc-950">
+                    {editProduct.shopSummaries?.length
+                      ? editProduct.shopSummaries
+                          .map((shop) => shop.shopName)
+                          .join(", ")
+                      : editProduct.shopName}
+                  </p>
+                </div>
+              </div>
+
               <div>
                 <label
                   htmlFor="catalogEditProductName"
@@ -858,6 +912,47 @@ export function ProductCatalog({
                   required
                   className="w-full rounded-full border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-950"
                 />
+              </div>
+
+              <div>
+                <p className="mb-2 block text-sm font-medium text-zinc-700">
+                  Shop
+                </p>
+                <div className="max-h-48 space-y-2 overflow-y-auto rounded-[20px] border border-zinc-200 p-3">
+                  {shops.map((shop) => {
+                    const isChecked = editSelectedShopIds.includes(shop.id);
+
+                    return (
+                      <label
+                        key={shop.id}
+                        className="flex cursor-pointer items-center gap-3 rounded-2xl px-3 py-2 transition hover:bg-zinc-50"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {
+                            setEditSelectedShopIds((currentShopIds) =>
+                              currentShopIds.includes(shop.id)
+                                ? currentShopIds.filter(
+                                    (currentShopId) => currentShopId !== shop.id
+                                  )
+                                : [...currentShopIds, shop.id]
+                            );
+                          }}
+                          className="h-4 w-4 rounded border-zinc-300 text-zinc-950 focus:ring-zinc-950"
+                        />
+                        <span className="text-sm text-zinc-700">
+                          {shop.shopName}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+                {editSelectedShopIds.length === 0 ? (
+                  <p className="mt-2 text-sm text-red-600">
+                    Select at least one shop.
+                  </p>
+                ) : null}
               </div>
 
               {editBrandOptions.length > 0 ? (
@@ -965,13 +1060,14 @@ export function ProductCatalog({
                   className="rounded-full border border-zinc-300 px-5 py-3 text-sm font-semibold text-zinc-700 hover:bg-zinc-100"
                   onClick={() => {
                     setEditProduct(null);
+                    setEditSelectedShopIds([]);
                   }}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={isSaving}
+                  disabled={isSaving || editSelectedShopIds.length === 0}
                   aria-busy={isSaving}
                   className="inline-flex items-center justify-center gap-2 rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
                 >

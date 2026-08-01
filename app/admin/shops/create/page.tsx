@@ -1,5 +1,3 @@
-import { redirect } from "next/navigation";
-
 import { createShopAction } from "@/features/shops/actions/create-shop";
 import {
   ShopForm,
@@ -12,9 +10,7 @@ export default function CreateShopPage() {
   ) {
     "use server";
 
-    await createShopAction(data);
-
-    redirect("/admin/shops");
+    return createShopAction(data);
   }
 
   return (

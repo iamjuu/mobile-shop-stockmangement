@@ -9,12 +9,15 @@ import { prisma } from "@/lib/prisma";
 type PageProps = {
   searchParams: Promise<{
     error?: string;
+    role?: string;
   }>;
 };
 
 async function signIn(formData: FormData) {
   "use server";
 
+  const requestedRole = String(formData.get("role") ?? "admin");
+  const shopId = String(formData.get("shopId") ?? "");
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
 
@@ -36,6 +39,24 @@ async function signIn(formData: FormData) {
     redirect("/sign-in?error=Invalid%20email%20or%20password");
   }
 
+  if (requestedRole === "admin" && user.role !== "ADMIN") {
+    redirect("/sign-in?role=admin&error=Use%20employee%20login%20for%20this%20account");
+  }
+
+  if (requestedRole === "employee" && user.role !== "EMPLOYEE") {
+    redirect("/sign-in?role=employee&error=Use%20admin%20login%20for%20this%20account");
+  }
+
+  if (user.role === "EMPLOYEE") {
+    if (!shopId) {
+      redirect("/sign-in?role=employee&error=Choose%20your%20shop%20before%20signing%20in");
+    }
+
+    if (!user.shopId || user.shopId !== shopId) {
+      redirect("/sign-in?role=employee&error=Invalid%20shop%20for%20this%20employee");
+    }
+  }
+
   await createAuthSession(user);
 
   if (user.role === "ADMIN") {
@@ -52,7 +73,16 @@ const features = [
 ];
 
 export default async function Page({ searchParams }: PageProps) {
-  const { error } = await searchParams;
+  const { error, role } = await searchParams;
+  const activeRole = role === "employee" ? "employee" : "admin";
+  const isEmployeeLogin = activeRole === "employee";
+  const shops = isEmployeeLogin
+    ? await prisma.shop.findMany({
+        orderBy: {
+          shopName: "asc",
+        },
+      })
+    : [];
 
   return (
     <main className="min-h-screen bg-[#f4f2eb] p-[10px] text-zinc-950">
@@ -105,10 +135,12 @@ export default async function Page({ searchParams }: PageProps) {
             <div className="mb-8">
               <p className="text-sm font-medium text-zinc-500">Welcome back</p>
               <h2 className="mt-2 text-4xl font-semibold text-zinc-950">
-                Sign in
+                {isEmployeeLogin ? "Employee sign in" : "Admin sign in"}
               </h2>
               <p className="mt-3 text-sm leading-6 text-zinc-600">
-                Access your stock management dashboard.
+                {isEmployeeLogin
+                  ? "Choose your shop and continue to billing."
+                  : "Continue to the admin dashboard without choosing a shop."}
               </p>
             </div>
 
@@ -118,7 +150,67 @@ export default async function Page({ searchParams }: PageProps) {
               </div>
             ) : null}
 
+            <div className="mb-6 grid grid-cols-2 gap-2 rounded-full bg-zinc-100 p-1">
+              <Link
+                href="/sign-in?role=admin"
+                className={`rounded-full px-4 py-2 text-center text-sm font-semibold transition ${
+                  !isEmployeeLogin
+                    ? "bg-zinc-950 text-white"
+                    : "text-zinc-600 hover:text-zinc-950"
+                }`}
+              >
+                Admin
+              </Link>
+              <Link
+                href="/sign-in?role=employee"
+                className={`rounded-full px-4 py-2 text-center text-sm font-semibold transition ${
+                  isEmployeeLogin
+                    ? "bg-zinc-950 text-white"
+                    : "text-zinc-600 hover:text-zinc-950"
+                }`}
+              >
+                Employee
+              </Link>
+            </div>
+
             <form action={signIn} className="space-y-5">
+              <input type="hidden" name="role" value={activeRole} />
+
+              {isEmployeeLogin ? (
+                <div>
+                  <label
+                    htmlFor="shopId"
+                    className="mb-2 block text-sm font-medium text-zinc-700"
+                  >
+                    Shop
+                  </label>
+                  <select
+                    id="shopId"
+                    name="shopId"
+                    required
+                    defaultValue=""
+                    className="w-full rounded-full border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-950"
+                  >
+                    <option value="">Choose employee shop</option>
+                    {shops.map((shop) => (
+                      <option key={shop.id} value={shop.id}>
+                        {shop.shopName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className="rounded-2xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
+                  Admin login does not need shop selection.
+                </div>
+              )}
+
+              {isEmployeeLogin && shops.length === 0 ? (
+                <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">
+                  No shops found. Create a shop before employee login.
+                </div>
+              ) : null}
+
               <div>
                 <label
                   htmlFor="email"
@@ -154,6 +246,7 @@ export default async function Page({ searchParams }: PageProps) {
               </div>
 
               <PendingSubmitButton
+                disabled={isEmployeeLogin && shops.length === 0}
                 pendingLabel="Signing in..."
                 className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
               >
@@ -162,9 +255,9 @@ export default async function Page({ searchParams }: PageProps) {
             </form>
 
             <p className="mt-6 text-center text-sm text-zinc-600">
-              Need an account?{" "}
+              Admin setup?{" "}
               <Link href="/sign-up" className="font-semibold text-zinc-950">
-                Sign up
+                Create admin account
               </Link>
             </p>
           </div>

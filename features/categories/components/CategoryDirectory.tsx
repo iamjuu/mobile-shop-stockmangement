@@ -25,7 +25,8 @@ interface CategoryDirectoryProps {
     categoryId: string,
     data: {
       name: string;
-      shopId?: string | null;
+      shopScope: "all" | "selected";
+      shopIds: string[];
     }
   ) => Promise<{
     ok: boolean;
@@ -44,6 +45,8 @@ export function CategoryDirectory({
   const [toast, setToast] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [editAllShopsSelected, setEditAllShopsSelected] = useState(false);
+  const [editSelectedShopIds, setEditSelectedShopIds] = useState<string[]>([]);
   const paginatedCategories = useMemo(
     () =>
       categories.slice(
@@ -60,25 +63,47 @@ export function CategoryDirectory({
     }, 2500);
   }
 
+  function toggleEditAllShops() {
+    setEditAllShopsSelected((current) => {
+      const nextValue = !current;
+
+      if (nextValue) {
+        setEditSelectedShopIds([]);
+      }
+
+      return nextValue;
+    });
+  }
+
+  function toggleEditShop(shopId: string) {
+    setEditAllShopsSelected(false);
+    setEditSelectedShopIds((currentShopIds) =>
+      currentShopIds.includes(shopId)
+        ? currentShopIds.filter((currentShopId) => currentShopId !== shopId)
+        : [...currentShopIds, shopId]
+    );
+  }
+
   async function handleUpdate(formData: FormData) {
     if (!editCategory) {
       return;
     }
-
-    const shopIdValue = String(formData.get("shopId") ?? "");
 
     setIsSaving(true);
 
     try {
       const result = await updateAction(editCategory.id, {
         name: String(formData.get("name") ?? ""),
-        shopId: shopIdValue === "all" ? null : shopIdValue,
+        shopScope: editAllShopsSelected ? "all" : "selected",
+        shopIds: editSelectedShopIds,
       });
 
       showToast(result.message);
 
       if (result.ok) {
         setEditCategory(null);
+        setEditAllShopsSelected(false);
+        setEditSelectedShopIds([]);
       }
     } finally {
       setIsSaving(false);
@@ -151,6 +176,10 @@ export function CategoryDirectory({
                         type="button"
                         className="inline-flex items-center gap-2 rounded-full border border-zinc-300 px-4 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
                         onClick={() => {
+                          setEditAllShopsSelected(!category.shopId);
+                          setEditSelectedShopIds(
+                            category.shopId ? [category.shopId] : []
+                          );
                           setEditCategory(category);
                         }}
                       >
@@ -226,28 +255,49 @@ export function CategoryDirectory({
               </div>
 
               <div>
-                <label
-                  htmlFor="editCategoryShop"
-                  className="mb-2 block text-sm font-medium text-zinc-700"
-                >
+                <p className="mb-2 block text-sm font-medium text-zinc-700">
                   Shop
-                </label>
-                <select
-                  id="editCategoryShop"
-                  name="shopId"
-                  defaultValue={editCategory.shopId ?? "all"}
-                  className="w-full rounded-full border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-950"
-                >
-                  <option value="all">All shops</option>
-                  {shops.map((shop) => (
-                    <option
-                      key={shop.id}
-                      value={shop.id}
-                    >
-                      {shop.shopName}
-                    </option>
-                  ))}
-                </select>
+                </p>
+
+                <div className="space-y-3">
+                  <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-zinc-200 px-4 py-3 transition hover:bg-zinc-50">
+                    <input
+                      type="checkbox"
+                      checked={editAllShopsSelected}
+                      onChange={toggleEditAllShops}
+                      className="h-4 w-4 rounded border-zinc-300 text-zinc-950 focus:ring-zinc-950"
+                    />
+                    <span className="text-sm font-medium text-zinc-900">
+                      All shops
+                    </span>
+                  </label>
+
+                  <div className="max-h-48 space-y-2 overflow-y-auto rounded-[20px] border border-zinc-200 p-3">
+                    {shops.map((shop) => {
+                      const isChecked = editSelectedShopIds.includes(shop.id);
+
+                      return (
+                        <label
+                          key={shop.id}
+                          className="flex cursor-pointer items-center gap-3 rounded-2xl px-3 py-2 transition hover:bg-zinc-50"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            disabled={editAllShopsSelected}
+                            onChange={() => {
+                              toggleEditShop(shop.id);
+                            }}
+                            className="h-4 w-4 rounded border-zinc-300 text-zinc-950 focus:ring-zinc-950 disabled:cursor-not-allowed"
+                          />
+                          <span className="text-sm text-zinc-700">
+                            {shop.shopName}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3 pt-2">
@@ -262,7 +312,10 @@ export function CategoryDirectory({
                 </button>
                 <button
                   type="submit"
-                  disabled={isSaving}
+                  disabled={
+                    isSaving ||
+                    (!editAllShopsSelected && editSelectedShopIds.length === 0)
+                  }
                   aria-busy={isSaving}
                   className="inline-flex items-center justify-center gap-2 rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
                 >

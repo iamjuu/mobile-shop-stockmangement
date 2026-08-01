@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 
 import type { ShopFormValues } from "../components/ShopForm";
 import { ShopService } from "../services/shop.service";
@@ -10,7 +11,32 @@ const service = new ShopService();
 export async function createShopAction(
   data: ShopFormValues
 ) {
-  await service.create(data);
+  try {
+    await service.create(data);
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return {
+        ok: false,
+        message: "Shop code already exists.",
+      };
+    }
+
+    return {
+      ok: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Shop could not be created.",
+    };
+  }
 
   revalidatePath("/admin/shops");
+
+  return {
+    ok: true,
+    message: "Shop created successfully.",
+  };
 }

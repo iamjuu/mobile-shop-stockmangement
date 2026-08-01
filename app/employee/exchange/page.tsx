@@ -26,6 +26,13 @@ function isOptionalValidImage(value: FormDataEntryValue | null) {
 }
 
 export default async function ExchangePage() {
+  const currentEmployeeId = await getCurrentUserId();
+  const currentEmployee = await prisma.user.findUnique({
+    where: {
+      id: currentEmployeeId,
+    },
+  });
+  const assignedShopId = currentEmployee?.shopId ?? "";
   const [
     shops,
     categories,
@@ -33,11 +40,28 @@ export default async function ExchangePage() {
     products,
   ] = await Promise.all([
     prisma.shop.findMany({
+      where: assignedShopId
+        ? {
+            id: assignedShopId,
+          }
+        : {
+            id: "__missing_shop__",
+          },
       orderBy: {
         shopName: "asc",
       },
     }),
     prisma.category.findMany({
+      where: {
+        OR: [
+          {
+            shopId: null,
+          },
+          {
+            shopId: assignedShopId || "__missing_shop__",
+          },
+        ],
+      },
       orderBy: {
         name: "asc",
       },
@@ -48,7 +72,10 @@ export default async function ExchangePage() {
       },
     }),
     prisma.product.findMany({
-      where: activeProductWhere,
+      where: {
+        ...activeProductWhere,
+        shopId: assignedShopId || "__missing_shop__",
+      },
       include: {
         shop: true,
         category: true,
@@ -104,7 +131,9 @@ export default async function ExchangePage() {
 
     if (
       !employee ||
+      !employee.shopId ||
       !shopId ||
+      shopId !== employee.shopId ||
       (dealType === "EXCHANGE" && !soldProductId) ||
       customerName.length < 2 ||
       customerPhone.length < 5 ||

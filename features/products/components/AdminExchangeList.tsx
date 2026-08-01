@@ -177,8 +177,8 @@ export function AdminExchangeList({ exchanges }: AdminExchangeListProps) {
           </div>
 
           {selectedExchange ? (
-            <aside className="bg-white p-5">
-              <div className="flex items-start justify-between gap-4">
+            <aside className="scrollbar-hover max-h-[calc(100dvh-10rem)] overflow-y-auto overscroll-contain bg-white p-5 xl:sticky xl:top-24 xl:self-start">
+              <div className="sticky top-0 z-10 -mx-5 -mt-5 flex items-start justify-between gap-4 border-b border-zinc-100 bg-white px-5 py-5">
                 <div>
                   <p className="text-sm font-medium text-zinc-500">
                     Complete exchange details
@@ -200,7 +200,7 @@ export function AdminExchangeList({ exchanges }: AdminExchangeListProps) {
               </div>
 
               <div className="mt-5 space-y-5">
-                <DetailGroup title="Exchange product">
+                <DetailGroup title="Exchange product" highlighted>
                   <Detail label="Product" value={selectedExchange.receivedProductName} />
                   <Detail label="Code" value={selectedExchange.receivedProductCode} />
                   <Detail
@@ -274,12 +274,20 @@ export function AdminExchangeList({ exchanges }: AdminExchangeListProps) {
 function DetailGroup({
   title,
   children,
+  highlighted = false,
 }: {
   title: string;
   children: React.ReactNode;
+  highlighted?: boolean;
 }) {
   return (
-    <div>
+    <div
+      className={
+        highlighted
+          ? "rounded-[20px] border border-emerald-200 bg-emerald-50/30 p-4"
+          : ""
+      }
+    >
       <p className="text-xs font-semibold uppercase text-zinc-500">{title}</p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">{children}</div>
     </div>

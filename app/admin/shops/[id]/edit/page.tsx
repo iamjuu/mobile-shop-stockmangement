@@ -1,5 +1,3 @@
-import { redirect } from "next/navigation";
-
 import {
   getShopByIdAction,
 } from "@/features/shops/actions/get-shop-by-id";
@@ -30,12 +28,10 @@ export default async function EditPage({
   ) {
     "use server";
 
-    await updateShopAction({
+    return updateShopAction({
       id,
       ...data,
     });
-
-    redirect("/admin/shops");
   }
 
   return (

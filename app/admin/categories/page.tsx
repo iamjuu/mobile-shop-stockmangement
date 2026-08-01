@@ -8,11 +8,8 @@ import {
 import { CategoryDirectory } from "@/features/categories/components/CategoryDirectory";
 import { CategoryService } from "@/features/categories/services/category.service";
 import { ShopService } from "@/features/shops/services/shop.service";
+import { cleanName, normalizeName } from "@/lib/normalize-name";
 import { prisma } from "@/lib/prisma";
-
-function normalizeCategoryName(name: string) {
-  return name.trim().replace(/\s+/g, " ").toLowerCase();
-}
 
 export default async function CategoriesPage() {
   const categoryService = new CategoryService();
@@ -31,9 +28,7 @@ export default async function CategoriesPage() {
   ): Promise<CategoryCreateState> {
     "use server";
 
-    const name = String(formData.get("name") ?? "")
-      .trim()
-      .replace(/\s+/g, " ");
+    const name = cleanName(String(formData.get("name") ?? ""));
     const shopScope = String(formData.get("shopScope") ?? "all");
     const selectedShopIds = Array.from(
       new Set(
@@ -78,19 +73,30 @@ export default async function CategoriesPage() {
       }
     }
 
+    const duplicateScope =
+      shopScope === "all"
+        ? {}
+        : {
+            OR: [
+              {
+                shopId: null,
+              },
+              {
+                shopId: {
+                  in: selectedShopIds,
+                },
+              },
+            ],
+          };
     const existingCategories = await prisma.category.findMany({
-      where: {
-        OR: targetShopIds.map((shopId) => ({
-          shopId,
-        })),
-      },
+      where: duplicateScope,
       include: {
         shop: true,
       },
     });
-    const normalizedName = normalizeCategoryName(name);
+    const normalizedName = normalizeName(name);
     const duplicateCategory = existingCategories.find(
-      (category) => normalizeCategoryName(category.name) === normalizedName
+      (category) => normalizeName(category.name) === normalizedName
     );
 
     if (duplicateCategory) {
@@ -98,7 +104,7 @@ export default async function CategoriesPage() {
         ok: false,
         message: `Category already exists for ${
           duplicateCategory.shop?.shopName ?? "All shops"
-        }.`,
+        }. Use the existing category instead of creating it again.`,
       };
     }
 
@@ -126,29 +132,114 @@ export default async function CategoriesPage() {
     categoryId: string,
     data: {
       name: string;
-      shopId?: string | null;
+      shopScope: "all" | "selected";
+      shopIds: string[];
     }
   ) {
     "use server";
 
-    const name = data.name.trim();
+    const name = cleanName(data.name);
+    const selectedShopIds = Array.from(new Set(data.shopIds.filter(Boolean)));
+    const targetShopIds =
+      data.shopScope === "all" ? [null] : selectedShopIds;
 
-    if (!categoryId || name.length < 2) {
+    if (!categoryId || name.length < 2 || targetShopIds.length === 0) {
       return {
         ok: false,
         message: "Invalid category details.",
       };
     }
 
-    await prisma.category.update({
+    const currentCategory = await prisma.category.findUnique({
       where: {
         id: categoryId,
       },
-      data: {
-        name,
-        shopId: data.shopId || null,
+    });
+
+    if (!currentCategory) {
+      return {
+        ok: false,
+        message: "Category not found.",
+      };
+    }
+
+    if (data.shopScope !== "all") {
+      const validShopCount = await prisma.shop.count({
+        where: {
+          id: {
+            in: selectedShopIds,
+          },
+        },
+      });
+
+      if (validShopCount !== selectedShopIds.length) {
+        return {
+          ok: false,
+          message: "One or more selected shops are invalid.",
+        };
+      }
+    }
+
+    const duplicateScope =
+      data.shopScope === "all"
+        ? {}
+        : {
+            OR: [
+              {
+                shopId: null,
+              },
+              {
+                shopId: {
+                  in: selectedShopIds,
+                },
+              },
+            ],
+          };
+    const matchingScopeCategories = await prisma.category.findMany({
+      where: {
+        ...duplicateScope,
+        NOT: {
+          id: categoryId,
+        },
+      },
+      include: {
+        shop: true,
       },
     });
+    const duplicateCategory = matchingScopeCategories.find(
+      (category) => normalizeName(category.name) === normalizeName(name)
+    );
+
+    if (duplicateCategory) {
+      return {
+        ok: false,
+        message: `Category already exists for ${
+          duplicateCategory.shop?.shopName ?? "All shops"
+        }. Use the existing category instead of creating it again.`,
+      };
+    }
+
+    const [firstShopId, ...additionalShopIds] = targetShopIds;
+
+    await prisma.$transaction([
+      prisma.category.update({
+        where: {
+          id: categoryId,
+        },
+        data: {
+          name,
+          shopId: firstShopId,
+        },
+      }),
+      ...additionalShopIds.map((shopId) =>
+        prisma.category.create({
+          data: {
+            name,
+            shopId,
+          },
+        })
+      ),
+    ]);
 
     revalidatePath("/admin/categories");
     revalidatePath("/admin/products");

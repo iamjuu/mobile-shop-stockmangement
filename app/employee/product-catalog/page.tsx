@@ -1,15 +1,33 @@
 import { PackageSearch } from "lucide-react";
 
 import { ProductCatalog } from "@/features/products/components/ProductCatalog";
+import { getCurrentUserId } from "@/lib/auth";
 import { activeProductWhere } from "@/lib/product-filters";
 import { prisma } from "@/lib/prisma";
 
 export default async function EmployeeProductCatalogPage() {
+  const employeeId = await getCurrentUserId();
+  const employee = await prisma.user.findUnique({
+    where: {
+      id: employeeId,
+    },
+  });
+  const assignedShopId = employee?.shopId ?? "";
   const [
     categories,
     products,
   ] = await Promise.all([
     prisma.category.findMany({
+      where: {
+        OR: [
+          {
+            shopId: null,
+          },
+          {
+            shopId: assignedShopId || "__missing_shop__",
+          },
+        ],
+      },
       include: {
         shop: true,
         _count: {
@@ -23,7 +41,10 @@ export default async function EmployeeProductCatalogPage() {
       },
     }),
     prisma.product.findMany({
-      where: activeProductWhere,
+      where: {
+        ...activeProductWhere,
+        shopId: assignedShopId || "__missing_shop__",
+      },
       include: {
         shop: true,
         category: true,
@@ -65,6 +86,7 @@ export default async function EmployeeProductCatalogPage() {
           categoryId: product.categoryId,
           categoryName: product.category.name,
           subcategoryId: product.subcategoryId,
+          shopId: product.shopId,
           shopName: product.shop.shopName,
           brandName: product.subcategory.name,
           purchasePrice: product.purchasePrice,

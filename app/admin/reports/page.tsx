@@ -589,6 +589,7 @@ export default async function ReportsPage({
         <DataTable
           emptyText="No products found for this filter."
           headers={["Product", "Code", "Shop", "Category", "Brand", "Stock", "Price"]}
+          maxHeightClassName="max-h-[450px]"
           rows={products.map((product) => [
             product.productName,
             product.productCode,
@@ -642,12 +643,6 @@ export default async function ReportsPage({
         </ReportCard>
       </section>
 
-      <div className="flex justify-end">
-        <ReportsExportButton
-          fileName={makeFileName(dateRange.label)}
-          sheets={exportSheets}
-        />
-      </div>
     </div>
   );
 }
@@ -676,15 +671,21 @@ function DataTable({
   headers,
   rows,
   emptyText,
+  maxHeightClassName,
 }: {
   headers: string[];
   rows: (string | number)[][];
   emptyText: string;
+  maxHeightClassName?: string;
 }) {
   return (
-    <div className="overflow-x-auto">
+    <div
+      className={`overflow-x-auto ${
+        maxHeightClassName ? `${maxHeightClassName} overflow-y-auto` : ""
+      }`}
+    >
       <table className="w-full min-w-[760px] border-collapse text-left">
-        <thead className="bg-zinc-50 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+        <thead className="sticky top-0 z-10 bg-zinc-50 text-xs font-semibold uppercase tracking-wide text-zinc-500">
           <tr>
             {headers.map((header) => (
               <th

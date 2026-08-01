@@ -1,4 +1,3 @@
-import { Package } from "lucide-react";
 import { revalidatePath } from "next/cache";
 
 import { CategoryService } from "@/features/categories/services/category.service";
@@ -6,7 +5,6 @@ import {
   ProductCreateForm,
   type ProductCreateState,
 } from "@/features/products/components/ProductCreateForm";
-import { ProductDirectory } from "@/features/products/components/ProductDirectory";
 import { productSchema } from "@/features/products/schemas/product.schema";
 import { ProductService } from "@/features/products/services/product.service";
 import { ShopService } from "@/features/shops/services/shop.service";
@@ -15,7 +13,6 @@ import {
   deleteCloudinaryAssets,
   uploadImageFile,
 } from "@/lib/cloudinary";
-import { archiveAndDeleteProduct } from "@/lib/product-archive";
 import { activeProductWhere } from "@/lib/product-filters";
 import { prisma } from "@/lib/prisma";
 
@@ -38,8 +35,6 @@ async function findDuplicateRegularProduct(data: {
   shopId: string;
   categoryId: string;
   subcategoryId: string;
-  purchasePrice?: number | null;
-  price: number;
   excludeProductId?: string;
 }) {
   const matchingProducts = await prisma.product.findMany({
@@ -49,8 +44,6 @@ async function findDuplicateRegularProduct(data: {
       shopId: data.shopId,
       categoryId: data.categoryId,
       subcategoryId: data.subcategoryId,
-      purchasePrice: data.purchasePrice ?? null,
-      price: data.price,
       ...(data.excludeProductId
         ? {
             NOT: {
@@ -78,18 +71,15 @@ export default async function ProductsPage() {
   const shopService = new ShopService();
   const categoryService = new CategoryService();
   const subCategoryService = new SubCategoryService();
-  const productService = new ProductService();
 
   const [
     shops,
     categories,
     subcategories,
-    products,
   ] = await Promise.all([
     shopService.getAll(),
     categoryService.getAll(),
     subCategoryService.getAll(),
-    productService.getAll(),
   ]);
 
   async function createProduct(
@@ -98,18 +88,26 @@ export default async function ProductsPage() {
   ): Promise<ProductCreateState> {
     "use server";
 
-    const shopIdValue = String(formData.get("shopId") ?? "");
+    const selectedShopIds = Array.from(
+      new Set(
+        formData
+          .getAll("shopIds")
+          .map((shopId) => String(shopId))
+          .filter(Boolean)
+      )
+    );
+    const primaryShopId = selectedShopIds[0] ?? "";
 
-    if (!shopIdValue || shopIdValue === "all") {
+    if (selectedShopIds.length === 0) {
       return {
         ok: false,
-        message: "Choose a shop before adding products.",
+        message: "Choose at least one shop before adding products.",
       };
     }
 
     const parsed = productSchema.safeParse({
       productName: formData.get("productName"),
-      shopId: shopIdValue,
+      shopId: primaryShopId,
       categoryId: formData.get("categoryId"),
       subcategoryId: formData.get("subcategoryId"),
       purchasePrice: formData.get("purchasePrice"),
@@ -148,15 +146,16 @@ export default async function ProductsPage() {
       };
     }
 
-    const [
-      category,
-    ] = await Promise.all([
-      prisma.category.findUnique({
-        where: {
-          id: parsed.data.categoryId,
-        },
-      }),
-    ]);
+    const category = await prisma.category.findUnique({
+      where: {
+        id: parsed.data.categoryId,
+      },
+      select: {
+        id: true,
+        name: true,
+        shopId: true,
+      },
+    });
 
     if (!category) {
       return {
@@ -172,6 +171,7 @@ export default async function ProductsPage() {
       },
       select: {
         id: true,
+        name: true,
       },
     });
 
@@ -189,43 +189,53 @@ export default async function ProductsPage() {
       };
     }
 
-    const targetShop = await prisma.shop.findFirst({
+    const targetShops = await prisma.shop.findMany({
       where: {
-        id: parsed.data.shopId,
+        id: {
+          in: selectedShopIds,
+        },
       },
       select: {
         id: true,
+        shopName: true,
       },
     });
 
-    if (!targetShop) {
+    if (targetShops.length !== selectedShopIds.length) {
       return {
         ok: false,
-        message: "Invalid shop.",
+        message: "One or more selected shops are invalid.",
       };
     }
 
-    if (category.shopId && category.shopId !== targetShop.id) {
+    if (selectedShopIds.length > 1 && category.shopId) {
+      return {
+        ok: false,
+        message: "Choose an All shops category when adding to multiple shops.",
+      };
+    }
+
+    if (category.shopId && category.shopId !== primaryShopId) {
       return {
         ok: false,
         message: "This category is not available for the selected shop.",
       };
     }
 
-    const duplicateProduct = await findDuplicateRegularProduct({
-      productName: parsed.data.productName,
-      shopId: targetShop.id,
-      categoryId: category.id,
-      subcategoryId: targetSubcategory.id,
-      purchasePrice: parsed.data.purchasePrice,
-      price: parsed.data.price,
-    });
+    for (const targetShop of targetShops) {
+      const duplicateProduct = await findDuplicateRegularProduct({
+        productName: parsed.data.productName,
+        shopId: targetShop.id,
+        categoryId: category.id,
+        subcategoryId: targetSubcategory.id,
+      });
 
-    if (duplicateProduct) {
-      return {
-        ok: false,
-        message: `This product already exists (${duplicateProduct.productCode}). Use Add Product to increase stock.`,
-      };
+      if (duplicateProduct) {
+        return {
+          ok: false,
+          message: `This product already exists in ${targetShop.shopName} (${duplicateProduct.productCode}). Change the existing product instead of creating another price.`,
+        };
+      }
     }
 
     const service = new ProductService();
@@ -255,16 +265,55 @@ export default async function ProductsPage() {
         .slice(1)
         .map((image) => image.secureUrl);
 
-      await service.create({
-        ...parsed.data,
-        productName: parsed.data.productName.trim().replace(/\s+/g, " "),
-        shopId: targetShop.id,
-        subcategoryId: targetSubcategory.id,
-        imageUrl: mainImageUrl,
-        mainImageUrl,
-        galleryImageUrls,
-        imeiNumber: parsed.data.imeiNumber,
-      });
+      const createdProducts = await Promise.all(
+        targetShops.map((targetShop) =>
+          service.create({
+            ...parsed.data,
+            productName: parsed.data.productName.trim().replace(/\s+/g, " "),
+            shopId: targetShop.id,
+            subcategoryId: targetSubcategory.id,
+            imageUrl: mainImageUrl,
+            mainImageUrl,
+            galleryImageUrls,
+            imeiNumber: parsed.data.imeiNumber,
+          })
+        )
+      );
+      const createdProduct = createdProducts[0];
+      const primaryShop =
+        targetShops.find((shop) => shop.id === createdProduct.shopId) ??
+        targetShops[0];
+
+      revalidatePath("/admin/products");
+      revalidatePath("/admin/admin-dashboard");
+
+      return {
+        ok: true,
+        message:
+          createdProducts.length === 1
+            ? "Product created successfully."
+            : `${createdProducts.length} products created successfully.`,
+        product: {
+          id: createdProduct.id,
+          productCode: createdProduct.productCode,
+          productName: createdProduct.productName,
+          categoryId: createdProduct.categoryId,
+          shopName:
+            createdProducts.length === 1
+              ? primaryShop.shopName
+              : `${primaryShop.shopName} +${createdProducts.length - 1}`,
+          categoryName: category.name,
+          subcategoryId: createdProduct.subcategoryId,
+          subcategoryName: targetSubcategory.name,
+          purchasePrice: createdProduct.purchasePrice,
+          price: createdProduct.price,
+          stock: createdProduct.stock,
+          mainImageUrl: createdProduct.mainImageUrl ?? createdProduct.imageUrl,
+          galleryImageUrls: createdProduct.galleryImageUrls,
+          description: createdProduct.description,
+          createdAt: createdProduct.createdAt.toISOString(),
+        },
+      };
     } catch {
       await deleteCloudinaryAssets(
         uploadedImages.map((image) => image.publicId)
@@ -275,14 +324,6 @@ export default async function ProductsPage() {
         message: "Product could not be created. Try again.",
       };
     }
-
-    revalidatePath("/admin/products");
-    revalidatePath("/admin/admin-dashboard");
-
-    return {
-      ok: true,
-      message: "Product created successfully.",
-    };
   }
 
   async function updateProduct(
@@ -350,15 +391,13 @@ export default async function ProductsPage() {
       shopId: product.shopId,
       categoryId: product.categoryId,
       subcategoryId: data.subcategoryId,
-      purchasePrice: data.purchasePrice,
-      price: data.price,
       excludeProductId: productId,
     });
 
     if (duplicateProduct) {
       return {
         ok: false,
-        message: `Another product already has these details (${duplicateProduct.productCode}).`,
+        message: `Another product already has this name, shop, category, and brand (${duplicateProduct.productCode}).`,
       };
     }
 
@@ -386,116 +425,6 @@ export default async function ProductsPage() {
     };
   }
 
-  async function deleteProduct(productId: string) {
-    "use server";
-
-    if (!productId) {
-      return {
-        ok: false,
-        message: "Invalid product.",
-      };
-    }
-
-    const result = await archiveAndDeleteProduct(productId);
-
-    if (!result.ok) {
-      return result;
-    }
-
-    revalidatePath("/admin/products");
-    revalidatePath("/admin/product-catalog");
-    revalidatePath("/admin/admin-dashboard");
-    revalidatePath("/employee/billing");
-    revalidatePath("/employee/product-catalog");
-
-    return {
-      ok: true,
-      message: result.message,
-    };
-  }
-
-  async function duplicateProduct(productId: string) {
-    "use server";
-
-    if (!productId) {
-      return {
-        ok: false,
-        message: "Invalid product.",
-      };
-    }
-
-    const product = await prisma.product.findFirst({
-      where: {
-        ...activeProductWhere,
-        id: productId,
-      },
-      include: {
-        shop: true,
-        category: true,
-        subcategory: true,
-      },
-    });
-
-    if (!product) {
-      return {
-        ok: false,
-        message: "Product not found.",
-      };
-    }
-
-    if ((product.source ?? "REGULAR") !== "REGULAR") {
-      return {
-        ok: false,
-        message: "Only regular products can be added this way.",
-      };
-    }
-
-    const updatedProduct = await prisma.product.update({
-      where: {
-        id: product.id,
-      },
-      data: {
-        stock: {
-          increment: 1,
-        },
-      },
-      include: {
-        shop: true,
-        category: true,
-        subcategory: true,
-      },
-    });
-
-    revalidatePath("/admin/products");
-    revalidatePath("/admin/admin-dashboard");
-    revalidatePath("/employee/billing");
-    revalidatePath("/employee/exchange");
-
-    return {
-      ok: true,
-      message: "Product stock increased successfully.",
-      product: {
-        id: updatedProduct.id,
-        productCode: updatedProduct.productCode,
-        productName: updatedProduct.productName,
-        source: updatedProduct.source ?? "REGULAR",
-        categoryId: updatedProduct.categoryId,
-        shopName: updatedProduct.shop.shopName,
-        categoryName: updatedProduct.category.name,
-        subcategoryId: updatedProduct.subcategoryId,
-        subcategoryName: updatedProduct.subcategory.name,
-        purchasePrice: updatedProduct.purchasePrice,
-        price: updatedProduct.price,
-        stock: updatedProduct.stock,
-        mainImageUrl: updatedProduct.mainImageUrl ?? updatedProduct.imageUrl,
-        galleryImageUrls: updatedProduct.galleryImageUrls,
-        description: updatedProduct.description,
-        createdAt: updatedProduct.createdAt,
-
-      },
-    };
-  }
-
   const formShops = shops.map((shop) => ({
     id: shop.id,
     shopName: shop.shopName,
@@ -515,65 +444,16 @@ export default async function ProductsPage() {
     name: subcategory.name,
     categoryId: subcategory.categoryId,
   }));
-const directoryProducts = products.map((product) => ({
-  id: product.id,
-  productCode: product.productCode,
-  productName: product.productName,
-  source: product.source ?? "REGULAR",
-  categoryId: product.categoryId,
-  shopName: product.shop.shopName,
-  categoryName: product.category.name,
-  subcategoryId: product.subcategoryId,
-  subcategoryName: product.subcategory.name,
-  purchasePrice: product.purchasePrice,
-  price: product.price,
-  stock: product.stock,
-  mainImageUrl: product.mainImageUrl ?? product.imageUrl,
-  galleryImageUrls: product.galleryImageUrls,
-  description: product.description,
-  createdAt: product.createdAt, // add this
-}));
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-5 xl:grid-cols-[430px_1fr]">
-        <section className="rounded-[24px] border border-zinc-200 bg-white p-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-zinc-950 text-white">
-              <Package className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-zinc-500">
-                Inventory setup
-              </p>
-              <h1 className="text-3xl font-semibold">
-                Add Product
-              </h1>
-            </div>
-          </div>
-
-          <p className="mt-4 text-sm leading-6 text-zinc-500">
-            Add products by selecting the shop first. Categories are filtered
-            by the shop, and brands are filtered by the selected category.
-          </p>
-
-          <ProductCreateForm
-            shops={formShops}
-            categories={formCategories}
-            subcategories={formSubcategories}
-            action={createProduct}
-          />
-        </section>
-
-        <ProductDirectory
-          key={directoryProducts.map((product) => product.id).join("|")}
-          products={directoryProducts}
-          subcategories={formSubcategories}
-          updateAction={updateProduct}
-          deleteAction={deleteProduct}
-          duplicateAction={duplicateProduct}
-        />
-      </div>
+      <ProductCreateForm
+        shops={formShops}
+        categories={formCategories}
+        subcategories={formSubcategories}
+        action={createProduct}
+        updateAction={updateProduct}
+      />
     </div>
   );
 }
